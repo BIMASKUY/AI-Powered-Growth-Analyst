@@ -159,12 +159,16 @@ export class GoogleAnalyticsService {
     data: analyticsdata_v1beta.Schema$RunReportResponse,
   ) {
     const metricValues = data.rows[0].metricValues;
+    const bounceRate = roundNumber<string>(metricValues[2].value);
+    const bounceRatePercent = bounceRate * 100;
 
     return {
       sessions: Number(metricValues[0].value),
       screen_page_views: Number(metricValues[1].value),
-      bounce_rate: roundNumber<string>(metricValues[2].value),
-      average_session_duration: roundNumber<string>(metricValues[3].value),
+      bounce_rate_percent: bounceRatePercent,
+      average_session_duration_seconds: roundNumber<string>(
+        metricValues[3].value,
+      ),
       active_users: Number(metricValues[4].value),
     };
   }
@@ -233,12 +237,15 @@ export class GoogleAnalyticsService {
         parse(rawDate, 'yyyyMMdd', new Date()),
         'yyyy-MM-dd',
       );
+      const bounceRate = roundNumber<string>(row.metricValues[2].value);
+      const bounceRatePercent = bounceRate * 100;
+
       return {
         date: formattedDate,
         sessions: Number(row.metricValues[0].value),
         screen_page_views: Number(row.metricValues[1].value),
-        bounce_rate: roundNumber<string>(row.metricValues[2].value),
-        average_session_duration: roundNumber<string>(
+        bounce_rate_percent: bounceRatePercent,
+        average_session_duration_seconds: roundNumber<string>(
           row.metricValues[3].value,
         ),
         active_users: Number(row.metricValues[4].value),
@@ -728,13 +735,16 @@ export class GoogleAnalyticsService {
     const { rows: allRowsData } = allData;
 
     const allFormattedData = allRowsData.map((row) => {
+      const bounceRate = roundNumber<string>(row.metricValues[2].value);
+      const bounceRatePercent = bounceRate * 100;
+
       return {
         page: row.dimensionValues[0].value,
         title: row.dimensionValues[1].value,
         sessions: Number(row.metricValues[0].value),
         screen_page_views: Number(row.metricValues[1].value),
-        bounce_rate: roundNumber<string>(row.metricValues[2].value),
-        average_session_duration: roundNumber<string>(
+        bounce_rate_percent: bounceRatePercent,
+        average_session_duration_seconds: roundNumber<string>(
           row.metricValues[3].value,
         ),
         active_users: Number(row.metricValues[4].value),

@@ -26,6 +26,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.2.0",
     "date-fns": "^4.1.0",
+    "google-ads-api": "^21.0.1",
     "google-auth-library": "^10.3.0",
     "googleapis": "^159.0.0",
     "reflect-metadata": "^0.2.2",

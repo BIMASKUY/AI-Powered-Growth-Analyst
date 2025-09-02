@@ -1,0 +1,462 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { Injectable, HttpException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { GoogleAdsApi, enums, Customer, services } from 'google-ads-api';
+import { roundNumber } from 'src/utils/global.utils';
+import { GetOverallCampaignsDto } from './dto/get-overall-campaigns.dto';
+import { GetDailyCampaignsDto } from './dto/get-daily-campaigns.dto';
+import { GetCampaignsDto } from './dto/get-campaigns.dto';
+
+@Injectable()
+export class GoogleAdsService {
+  private readonly clientId: string;
+  private readonly clientSecret: string;
+  private readonly customerAccountId: string;
+  private readonly managerAccountDeveloperToken: string;
+  private readonly testingRefreshToken: string;
+
+  constructor(
+    // private readonly supabaseService: SupabaseService,
+    private readonly configService: ConfigService,
+  ) {
+    this.clientId = this.configService.getOrThrow('GOOGLE_CLIENT_ID');
+    this.clientSecret = this.configService.getOrThrow('GOOGLE_CLIENT_SECRET');
+
+    this.customerAccountId = this.configService.getOrThrow(
+      'TESTING_ADS_CUSTOMER_ACCOUNT_ID',
+    );
+    this.managerAccountDeveloperToken = this.configService.getOrThrow(
+      'TESTING_ADS_MANAGER_ACCOUNT_DEVELOPER_TOKEN',
+    );
+    this.testingRefreshToken = this.configService.getOrThrow(
+      'TESTING_REFRESH_TOKEN',
+    );
+  }
+
+  private async getRefreshToken(clientId: string) {
+    // const { data: googleOauth, error: googleOauthError } =
+    //   await this.supabaseService
+    //     .getClient()
+    //     .from('google_oauth')
+    //     .select('refresh_token, scope')
+    //     .eq('client_id', clientId)
+    //     .maybeSingle();
+
+    // const { refresh_token, scope } = googleOauth || {};
+
+    // if (!refresh_token || !scope) {
+    //   throw new HttpException('Google OAuth is required', 404);
+    // }
+
+    // if (googleOauthError) {
+    //   Logger.error(
+    //     'failed to get google oauth',
+    //     googleOauthError.message,
+    //     'GoogleAdsService',
+    //   );
+    //   throw new HttpException('failed to get google oauth', 500);
+    // }
+
+    // const scopeArray = scope.trim().split(' ');
+    // const isGoogleAdsScope = scopeArray.includes(
+    //   'https://www.googleapis.com/auth/adwords',
+    // );
+    // if (!isGoogleAdsScope) {
+    //   throw new HttpException(
+    //     'google ads scope is required on google oauth',
+    //     400,
+    //   );
+    // }
+
+    const refresh_token = this.testingRefreshToken;
+
+    return refresh_token;
+  }
+
+  private async getGoogleAdsClient(clientId: string): Promise<{
+    googleAdsClient: GoogleAdsApi;
+    customer_account_id: string;
+  }> {
+    // const { data: googleAds, error: googleAdsError } =
+    //   await this.supabaseService
+    //     .getClient()
+    //     .from('google_ads')
+    //     .select('customer_account_id, manager_account_developer_token')
+    //     .eq('client_id', clientId)
+    //     .maybeSingle();
+
+    // const { customer_account_id, manager_account_developer_token } =
+    //   googleAds || {};
+
+    // if (!customer_account_id || !manager_account_developer_token) {
+    //   throw new HttpException(
+    //     'google ads customer_account_id and manager_account_developer_token are required',
+    //     404,
+    //   );
+    // }
+
+    // if (googleAdsError) {
+    //   Logger.error(
+    //     'error fetch google ads',
+    //     googleAdsError.message,
+    //     'GoogleAdsService',
+    //   );
+    //   throw new HttpException('failed to get google ads', 500);
+    // }
+
+    // testing purpose
+    const customer_account_id = this.customerAccountId;
+    const manager_account_developer_token = this.managerAccountDeveloperToken;
+
+    const googleAdsClient = new GoogleAdsApi({
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      developer_token: manager_account_developer_token,
+    });
+
+    return {
+      googleAdsClient,
+      customer_account_id,
+    };
+  }
+
+  private async getCustomer(clientId: string) {
+    const [{ googleAdsClient, customer_account_id: customerId }, refreshToken] =
+      await Promise.all([
+        this.getGoogleAdsClient(clientId),
+        this.getRefreshToken(clientId),
+      ]);
+
+    const customer: Customer = googleAdsClient.Customer({
+      customer_id: customerId,
+      refresh_token: refreshToken,
+    });
+
+    return customer;
+  }
+
+  // private async fetchGetCampaignById(
+  //   customer: Customer,
+  //   startDate: string,
+  //   endDate: string,
+  //   orderBy: 'ASC' | 'DESC',
+  //   campaignId: string,
+  // ) {
+  //   return await customer.query(`
+  //     SELECT
+  //       campaign.name,
+  //       campaign.status,
+  //       metrics.clicks,
+  //       metrics.impressions,
+  //       metrics.cost_micros,
+  //       metrics.conversions,
+  //       metrics.conversions_value,
+  //       metrics.ctr,
+  //       segments.date
+  //     FROM campaign
+  //     WHERE campaign.id = ${campaignId}
+  //       AND campaign.status IN ('ENABLED', 'PAUSED')
+  //       AND segments.date BETWEEN '${startDate}' AND '${endDate}'
+  //     ORDER BY segments.date ${orderBy}
+  //   `);
+  // }
+
+  // private formatGetCampaignById(
+  //   campaigns: services.IGoogleAdsRow[],
+  //   limit: number,
+  //   page: number,
+  // ) {
+  //   const allCampaigns = campaigns.map((item) => {
+  //     const spend = item.metrics.cost_micros / 1000000;
+  //     const conversionValue = item.metrics.conversions_value;
+  //     const conversions = item.metrics.conversions;
+  //     const clicks = item.metrics.clicks;
+  //     const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
+  //     const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
+  //     const roundedRoi = roundNumber<number>(roi);
+  //     const roundedConversionRates = roundNumber<number>(conversionRates);
+  //     const roundedSpend = roundNumber<number>(spend);
+  //     const roundedCtr = item.metrics.ctr
+  //       ? roundNumber<number>(item.metrics.ctr)
+  //       : item.metrics.ctr;
+  //     return {
+  //       date: item.segments.date,
+  //       impressions: item.metrics.impressions,
+  //       spend: roundedSpend,
+  //       conversion_rates: roundedConversionRates,
+  //       ctr: roundedCtr,
+  //       roi: roundedRoi,
+  //     };
+  //   });
+
+  //   const paginatedCampaigns = allCampaigns.slice(
+  //     (page - 1) * limit,
+  //     page * limit,
+  //   );
+
+  //   return {
+  //     paginatedCampaigns,
+  //     allCampaigns,
+  //   };
+  // }
+
+  // async getCampaignById(
+  //   query: GetCampaignByIdQueryDto,
+  //   campaignId: string,
+  //   clientId: string,
+  // ) {
+  //   query = GoogleAdsValidation.getCampaignByIdQuery.parse(
+  //     query,
+  //   ) as GetCampaignByIdQueryDto;
+  //   campaignId = GoogleAdsValidation.getCampaignByIdParam.parse(campaignId);
+
+  //   const customer = await this.getCustomer(clientId);
+  //   const orderBy = query.order_by.toUpperCase() as 'ASC' | 'DESC';
+
+  //   const campaigns = await this.fetchGetCampaignById(
+  //     customer,
+  //     query.start_date,
+  //     query.end_date,
+  //     orderBy,
+  //     campaignId,
+  //   );
+
+  //   // Case when data not found
+  //   const hasData = campaigns?.length > 0;
+  //   if (!hasData) {
+  //     return {
+  //       pagination: pagination(0, query.page, query.limit),
+  //       analysis: 'No data found',
+  //       data: [] as string[],
+  //     };
+  //   }
+
+  //   const { paginatedCampaigns, allCampaigns } = this.formatGetCampaignById(
+  //     campaigns,
+  //     query.limit,
+  //     query.page,
+  //   );
+
+  //   // Case when paginated data is []
+  //   const totalAllCampaigns = allCampaigns.length;
+  //   const totalPaginatedCampaigns = paginatedCampaigns.length;
+  //   if (totalPaginatedCampaigns === 0) {
+  //     return {
+  //       pagination: pagination(totalAllCampaigns, query.page, query.limit),
+  //       analysis: 'No data found',
+  //       data: [] as string[],
+  //     };
+  //   }
+
+  //   const analysis = await openaiAnalysis(
+  //     allCampaigns,
+  //     `Provides data-driven google ads campaigns analysis with specific recommendations based on the dataset.`,
+  //   );
+
+  //   return {
+  //     pagination: pagination(totalAllCampaigns, query.page, query.limit),
+  //     analysis,
+  //     data: paginatedCampaigns,
+  //   };
+  // }
+
+  private async fetchGetOverallCampaigns(
+    customer: Customer,
+    startDate: string,
+    endDate: string,
+  ) {
+    const campaigns = await customer.report({
+      entity: 'customer',
+      metrics: [
+        'metrics.clicks',
+        'metrics.impressions',
+        'metrics.cost_micros',
+        'metrics.conversions',
+        'metrics.conversions_value',
+        'metrics.ctr',
+      ],
+      from_date: startDate,
+      to_date: endDate,
+    });
+
+    return campaigns[0];
+  }
+
+  private formatGetOverallCampaigns(campaign: services.IGoogleAdsRow) {
+    const spend = campaign.metrics.cost_micros / 1000000;
+    const conversionValue = campaign.metrics.conversions_value;
+    const conversions = campaign.metrics.conversions;
+    const clicks = campaign.metrics.clicks;
+    const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
+    const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
+
+    return {
+      impressions: campaign.metrics.impressions,
+      spend: roundNumber<number>(spend),
+      conversion_rates: roundNumber<number>(conversionRates),
+      ctr: campaign.metrics.ctr
+        ? roundNumber<number>(campaign.metrics.ctr)
+        : campaign.metrics.ctr,
+      roi: roundNumber<number>(roi),
+    };
+  }
+
+  async getOverallCampaigns(dto: GetOverallCampaignsDto, clientId: string) {
+    const customer = await this.getCustomer(clientId);
+
+    const campaign = await this.fetchGetOverallCampaigns(
+      customer,
+      dto.start_date,
+      dto.end_date,
+    );
+
+    const formattedCampaigns = this.formatGetOverallCampaigns(campaign);
+    return formattedCampaigns;
+  }
+
+  private async fetchGetDailyCampaigns(
+    customer: Customer,
+    startDate: string,
+    endDate: string,
+  ) {
+    return await customer.report({
+      entity: 'customer',
+      metrics: [
+        'metrics.clicks',
+        'metrics.impressions',
+        'metrics.cost_micros',
+        'metrics.conversions',
+        'metrics.conversions_value',
+        'metrics.ctr',
+      ],
+      segments: ['segments.date'],
+      order: [
+        {
+          field: 'segments.date',
+          sort_order: 'ASC',
+        },
+      ],
+      from_date: startDate,
+      to_date: endDate,
+    });
+  }
+
+  private formatGetDailyCampaigns(campaigns: services.IGoogleAdsRow[]) {
+    const allCampaigns = campaigns.map((campaign) => {
+      const spend = campaign.metrics.cost_micros / 1000000;
+      const conversionValue = campaign.metrics.conversions_value;
+      const conversions = campaign.metrics.conversions;
+      const clicks = campaign.metrics.clicks;
+      const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
+      const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
+      const roundedRoi = roundNumber<number>(roi);
+      const roundedConversionRates = roundNumber<number>(conversionRates);
+      const roundedSpend = roundNumber<number>(spend);
+      const roundedCtr = campaign.metrics.ctr
+        ? roundNumber<number>(campaign.metrics.ctr)
+        : campaign.metrics.ctr;
+
+      return {
+        date: campaign.segments.date,
+        impressions: campaign.metrics.impressions,
+        spend: roundedSpend,
+        conversion_rates: roundedConversionRates,
+        ctr: roundedCtr,
+        roi: roundedRoi,
+      };
+    });
+
+    return allCampaigns;
+  }
+
+  async getDailyCampaigns(dto: GetDailyCampaignsDto, clientId: string) {
+    const customer = await this.getCustomer(clientId);
+
+    const campaigns = await this.fetchGetDailyCampaigns(
+      customer,
+      dto.start_date,
+      dto.end_date,
+    );
+
+    // Case when data not found
+    const hasData = campaigns?.length > 0;
+    if (!hasData) return [] as string[];
+
+    const formattedCampaigns = this.formatGetDailyCampaigns(campaigns);
+    return formattedCampaigns;
+  }
+
+  private async fetchGetCampaigns(
+    customer: Customer,
+    startDate: string,
+    endDate: string,
+  ) {
+    return await customer.query(`
+      SELECT
+        campaign.name,
+        campaign.status,
+        metrics.clicks,
+        metrics.impressions,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value,
+        metrics.ctr
+      FROM campaign
+      WHERE campaign.status IN ('ENABLED', 'PAUSED')
+        AND metrics.impressions > 0
+        AND segments.date BETWEEN '${startDate}' AND '${endDate}'
+      ORDER BY metrics.impressions DESC
+    `);
+  }
+
+  private formatGetCampaigns(campaigns: services.IGoogleAdsRow[]) {
+    const allCampaigns = campaigns.map((campaign) => {
+      const id = campaign.campaign.resource_name.split('/')[3];
+      const status = enums.CampaignStatus[campaign.campaign.status];
+      const spend = campaign.metrics.cost_micros / 1000000;
+      const conversionValue = campaign.metrics.conversions_value;
+      const conversions = campaign.metrics.conversions;
+      const clicks = campaign.metrics.clicks;
+
+      const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
+      const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
+
+      const roundedRoi = roundNumber<number>(roi);
+      const roundedConversionRates = roundNumber<number>(conversionRates);
+      const roundedSpend = roundNumber<number>(spend);
+      const roundedCtr = campaign.metrics.ctr
+        ? roundNumber<number>(campaign.metrics.ctr)
+        : campaign.metrics.ctr;
+
+      return {
+        id,
+        name: campaign.campaign.name,
+        status,
+        impressions: campaign.metrics.impressions,
+        spend: roundedSpend,
+        conversion_rates: roundedConversionRates,
+        ctr: roundedCtr,
+        roi: roundedRoi,
+      };
+    });
+
+    return allCampaigns;
+  }
+
+  async getCampaigns(dto: GetCampaignsDto, clientId: string) {
+    const customer = await this.getCustomer(clientId);
+
+    const campaigns = await this.fetchGetCampaigns(
+      customer,
+      dto.start_date,
+      dto.end_date,
+    );
+
+    // Case when data not found
+    const hasData = campaigns?.length > 0;
+    if (!hasData) return [] as string[];
+
+    const formattedCampaigns = this.formatGetCampaigns(campaigns);
+    return formattedCampaigns;
+  }
+}
