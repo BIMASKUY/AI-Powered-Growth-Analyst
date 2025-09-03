@@ -282,23 +282,43 @@ export class GoogleAdsService {
     return campaigns[0];
   }
 
-  private formatGetOverallCampaigns(campaign: services.IGoogleAdsRow) {
+  private formatGetOverallCampaigns(
+    campaign: services.IGoogleAdsRow,
+    currencyCode: string,
+  ) {
     const spend = campaign.metrics.cost_micros / 1000000;
+    const roundedSpend = roundNumber<number>(spend);
     const conversionValue = campaign.metrics.conversions_value;
     const conversions = campaign.metrics.conversions;
     const clicks = campaign.metrics.clicks;
     const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
-    const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
+    const roiPercent = roundNumber<number>(roi * 100);
+    const conversionRates = clicks > 0 ? conversions / clicks : 0;
+    const conversionRatePercent = roundNumber<number>(conversionRates * 100);
+    const ctrPercent = campaign.metrics.ctr
+      ? roundNumber<number>(campaign.metrics.ctr * 100)
+      : campaign.metrics.ctr;
+    const spendFieldName = `spend_${currencyCode}`;
 
     return {
       impressions: campaign.metrics.impressions,
-      spend: roundNumber<number>(spend),
-      conversion_rates: roundNumber<number>(conversionRates),
-      ctr: campaign.metrics.ctr
-        ? roundNumber<number>(campaign.metrics.ctr)
-        : campaign.metrics.ctr,
-      roi: roundNumber<number>(roi),
+      [spendFieldName]: roundedSpend,
+      conversion_rate_percent: conversionRatePercent,
+      ctr_percent: ctrPercent,
+      roi_percent: roiPercent,
     };
+  }
+
+  private async getCurrencyCode(customer: Customer) {
+    const customerInfo = await customer.query(`
+      SELECT customer.currency_code
+      FROM customer
+      LIMIT 1
+    `);
+
+    const rawCurrencyCode = customerInfo[0]?.customer?.currency_code;
+    const currencyCode = rawCurrencyCode?.toLowerCase() || 'usd';
+    return currencyCode;
   }
 
   async getOverallCampaigns(dto: GetOverallCampaignsDto, clientId: string) {
@@ -310,7 +330,12 @@ export class GoogleAdsService {
       dto.end_date,
     );
 
-    const formattedCampaigns = this.formatGetOverallCampaigns(campaign);
+    const currencyCode = await this.getCurrencyCode(customer);
+
+    const formattedCampaigns = this.formatGetOverallCampaigns(
+      campaign,
+      currencyCode,
+    );
     return formattedCampaigns;
   }
 
@@ -341,28 +366,33 @@ export class GoogleAdsService {
     });
   }
 
-  private formatGetDailyCampaigns(campaigns: services.IGoogleAdsRow[]) {
+  private formatGetDailyCampaigns(
+    campaigns: services.IGoogleAdsRow[],
+    currencyCode: string,
+  ) {
     const allCampaigns = campaigns.map((campaign) => {
       const spend = campaign.metrics.cost_micros / 1000000;
+      const roundedSpend = roundNumber<number>(spend);
       const conversionValue = campaign.metrics.conversions_value;
       const conversions = campaign.metrics.conversions;
       const clicks = campaign.metrics.clicks;
       const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
-      const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
-      const roundedRoi = roundNumber<number>(roi);
-      const roundedConversionRates = roundNumber<number>(conversionRates);
-      const roundedSpend = roundNumber<number>(spend);
-      const roundedCtr = campaign.metrics.ctr
-        ? roundNumber<number>(campaign.metrics.ctr)
+      const roiPercent = roundNumber<number>(roi * 100);
+      const conversionRates = clicks > 0 ? conversions / clicks : 0;
+      const conversionRatePercent = roundNumber<number>(conversionRates * 100);
+      const ctrPercent = campaign.metrics.ctr
+        ? roundNumber<number>(campaign.metrics.ctr * 100)
         : campaign.metrics.ctr;
+
+      const spendFieldName = `spend_${currencyCode}`;
 
       return {
         date: campaign.segments.date,
         impressions: campaign.metrics.impressions,
-        spend: roundedSpend,
-        conversion_rates: roundedConversionRates,
-        ctr: roundedCtr,
-        roi: roundedRoi,
+        [spendFieldName]: roundedSpend,
+        conversion_rate_percent: conversionRatePercent,
+        ctr_percent: ctrPercent,
+        roi_percent: roiPercent,
       };
     });
 
@@ -382,7 +412,12 @@ export class GoogleAdsService {
     const hasData = campaigns?.length > 0;
     if (!hasData) return [] as string[];
 
-    const formattedCampaigns = this.formatGetDailyCampaigns(campaigns);
+    const currencyCode = await this.getCurrencyCode(customer);
+
+    const formattedCampaigns = this.formatGetDailyCampaigns(
+      campaigns,
+      currencyCode,
+    );
     return formattedCampaigns;
   }
 
@@ -409,7 +444,10 @@ export class GoogleAdsService {
     `);
   }
 
-  private formatGetCampaigns(campaigns: services.IGoogleAdsRow[]) {
+  private formatGetCampaigns(
+    campaigns: services.IGoogleAdsRow[],
+    currencyCode: string,
+  ) {
     const allCampaigns = campaigns.map((campaign) => {
       const id = campaign.campaign.resource_name.split('/')[3];
       const status = enums.CampaignStatus[campaign.campaign.status];
@@ -419,24 +457,26 @@ export class GoogleAdsService {
       const clicks = campaign.metrics.clicks;
 
       const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
-      const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
+      const roiPercent = roundNumber<number>(roi * 100);
+      const conversionRates = clicks > 0 ? conversions / clicks : 0;
+      const conversionRatePercent = roundNumber<number>(conversionRates * 100);
 
-      const roundedRoi = roundNumber<number>(roi);
-      const roundedConversionRates = roundNumber<number>(conversionRates);
       const roundedSpend = roundNumber<number>(spend);
-      const roundedCtr = campaign.metrics.ctr
-        ? roundNumber<number>(campaign.metrics.ctr)
+      const ctrPercent = campaign.metrics.ctr
+        ? roundNumber<number>(campaign.metrics.ctr * 100)
         : campaign.metrics.ctr;
+
+      const spendFieldName = `spend_${currencyCode}`;
 
       return {
         id,
         name: campaign.campaign.name,
         status,
         impressions: campaign.metrics.impressions,
-        spend: roundedSpend,
-        conversion_rates: roundedConversionRates,
-        ctr: roundedCtr,
-        roi: roundedRoi,
+        [spendFieldName]: roundedSpend,
+        conversion_rate_percent: conversionRatePercent,
+        ctr_percent: ctrPercent,
+        roi_percent: roiPercent,
       };
     });
 
@@ -456,7 +496,9 @@ export class GoogleAdsService {
     const hasData = campaigns?.length > 0;
     if (!hasData) return [] as string[];
 
-    const formattedCampaigns = this.formatGetCampaigns(campaigns);
+    const currencyCode = await this.getCurrencyCode(customer);
+
+    const formattedCampaigns = this.formatGetCampaigns(campaigns, currencyCode);
     return formattedCampaigns;
   }
 }

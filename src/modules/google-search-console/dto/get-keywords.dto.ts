@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class GetPagesDto {
+export class GetKeywordsDto {
   @ApiProperty({
     example: '2025-01-01',
   })
   start_date: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2025-01-31',
   })
   end_date: string;
@@ -14,11 +14,11 @@ export class GetPagesDto {
   @ApiPropertyOptional({
     default: 10,
   })
-  limit: number;
+  limit?: number;
 
   @ApiPropertyOptional({
-    example: 'bmw',
-    description: 'Search for a specific page',
+    default: '',
+    description: 'Search for a specific keyword',
   })
-  search: string;
+  search?: string;
 }

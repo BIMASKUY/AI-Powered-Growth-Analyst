@@ -1,12 +1,13 @@
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleAnalyticsService } from './google-analytics.service';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetPagesDto } from './dto/get-pages.dto';
 
 // @ApiBearerAuth()
 // @UseGuards(AuthGuard)
+@ApiTags('Google Analytics')
 @Controller('google-analytics')
 export class GoogleAnalyticsController {
   constructor(

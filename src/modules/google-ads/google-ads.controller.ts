@@ -11,6 +11,7 @@ import { GetCampaignsDto } from './dto/get-campaigns.dto';
 
 // @ApiBearerAuth()
 // @UseGuards(AuthGuard)
+@ApiTags('Google Ads')
 @Controller('google-ads')
 export class GoogleAdsController {
   constructor(private readonly googleAdsService: GoogleAdsService) {}

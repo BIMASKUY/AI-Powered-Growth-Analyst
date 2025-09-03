@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class GetCampaignsDto {
+export class GetOverallDto {
   @ApiProperty({
-    example: '2023-01-01',
+    example: '2025-01-01',
   })
   start_date: string;
 

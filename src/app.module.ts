@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { GoogleAnalyticsModule } from './modules/google-analytics/google-analytics.module';
 import { GoogleAdsModule } from './modules/google-ads/google-ads.module';
+import { GoogleSearchConsoleModule } from './modules/google-search-console/google-search-console.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { GoogleAdsModule } from './modules/google-ads/google-ads.module';
       envFilePath: '.env',
     }),
     GoogleAnalyticsModule,
+    GoogleSearchConsoleModule,
     GoogleAdsModule,
   ],
   controllers: [AppController],
