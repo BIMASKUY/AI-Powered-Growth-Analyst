@@ -3,9 +3,10 @@ import { Injectable, HttpException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleAdsApi, enums, Customer, services } from 'google-ads-api';
 import { roundNumber } from 'src/utils/global.utils';
-import { GetOverallCampaignsDto } from './dto/get-overall-campaigns.dto';
-import { GetDailyCampaignsDto } from './dto/get-daily-campaigns.dto';
+import { GetOverallDto } from './dto/get-overall.dto';
+import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';
+import { GetCampaignByIdDto } from './dto/get-campaign-by-id.dto';
 
 @Injectable()
 export class GoogleAdsService {
@@ -135,132 +136,7 @@ export class GoogleAdsService {
     return customer;
   }
 
-  // private async fetchGetCampaignById(
-  //   customer: Customer,
-  //   startDate: string,
-  //   endDate: string,
-  //   orderBy: 'ASC' | 'DESC',
-  //   campaignId: string,
-  // ) {
-  //   return await customer.query(`
-  //     SELECT
-  //       campaign.name,
-  //       campaign.status,
-  //       metrics.clicks,
-  //       metrics.impressions,
-  //       metrics.cost_micros,
-  //       metrics.conversions,
-  //       metrics.conversions_value,
-  //       metrics.ctr,
-  //       segments.date
-  //     FROM campaign
-  //     WHERE campaign.id = ${campaignId}
-  //       AND campaign.status IN ('ENABLED', 'PAUSED')
-  //       AND segments.date BETWEEN '${startDate}' AND '${endDate}'
-  //     ORDER BY segments.date ${orderBy}
-  //   `);
-  // }
-
-  // private formatGetCampaignById(
-  //   campaigns: services.IGoogleAdsRow[],
-  //   limit: number,
-  //   page: number,
-  // ) {
-  //   const allCampaigns = campaigns.map((item) => {
-  //     const spend = item.metrics.cost_micros / 1000000;
-  //     const conversionValue = item.metrics.conversions_value;
-  //     const conversions = item.metrics.conversions;
-  //     const clicks = item.metrics.clicks;
-  //     const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
-  //     const conversionRates = clicks > 0 ? (conversions / clicks) * 100 : 0;
-  //     const roundedRoi = roundNumber<number>(roi);
-  //     const roundedConversionRates = roundNumber<number>(conversionRates);
-  //     const roundedSpend = roundNumber<number>(spend);
-  //     const roundedCtr = item.metrics.ctr
-  //       ? roundNumber<number>(item.metrics.ctr)
-  //       : item.metrics.ctr;
-  //     return {
-  //       date: item.segments.date,
-  //       impressions: item.metrics.impressions,
-  //       spend: roundedSpend,
-  //       conversion_rates: roundedConversionRates,
-  //       ctr: roundedCtr,
-  //       roi: roundedRoi,
-  //     };
-  //   });
-
-  //   const paginatedCampaigns = allCampaigns.slice(
-  //     (page - 1) * limit,
-  //     page * limit,
-  //   );
-
-  //   return {
-  //     paginatedCampaigns,
-  //     allCampaigns,
-  //   };
-  // }
-
-  // async getCampaignById(
-  //   query: GetCampaignByIdQueryDto,
-  //   campaignId: string,
-  //   clientId: string,
-  // ) {
-  //   query = GoogleAdsValidation.getCampaignByIdQuery.parse(
-  //     query,
-  //   ) as GetCampaignByIdQueryDto;
-  //   campaignId = GoogleAdsValidation.getCampaignByIdParam.parse(campaignId);
-
-  //   const customer = await this.getCustomer(clientId);
-  //   const orderBy = query.order_by.toUpperCase() as 'ASC' | 'DESC';
-
-  //   const campaigns = await this.fetchGetCampaignById(
-  //     customer,
-  //     query.start_date,
-  //     query.end_date,
-  //     orderBy,
-  //     campaignId,
-  //   );
-
-  //   // Case when data not found
-  //   const hasData = campaigns?.length > 0;
-  //   if (!hasData) {
-  //     return {
-  //       pagination: pagination(0, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
-
-  //   const { paginatedCampaigns, allCampaigns } = this.formatGetCampaignById(
-  //     campaigns,
-  //     query.limit,
-  //     query.page,
-  //   );
-
-  //   // Case when paginated data is []
-  //   const totalAllCampaigns = allCampaigns.length;
-  //   const totalPaginatedCampaigns = paginatedCampaigns.length;
-  //   if (totalPaginatedCampaigns === 0) {
-  //     return {
-  //       pagination: pagination(totalAllCampaigns, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
-
-  //   const analysis = await openaiAnalysis(
-  //     allCampaigns,
-  //     `Provides data-driven google ads campaigns analysis with specific recommendations based on the dataset.`,
-  //   );
-
-  //   return {
-  //     pagination: pagination(totalAllCampaigns, query.page, query.limit),
-  //     analysis,
-  //     data: paginatedCampaigns,
-  //   };
-  // }
-
-  private async fetchGetOverallCampaigns(
+  private async fetchGetOverall(
     customer: Customer,
     startDate: string,
     endDate: string,
@@ -282,26 +158,26 @@ export class GoogleAdsService {
     return campaigns[0];
   }
 
-  private formatGetOverallCampaigns(
-    campaign: services.IGoogleAdsRow,
+  private formatGetOverall(
+    campaigns: services.IGoogleAdsRow,
     currencyCode: string,
   ) {
-    const spend = campaign.metrics.cost_micros / 1000000;
+    const spend = campaigns.metrics.cost_micros / 1000000;
     const roundedSpend = roundNumber<number>(spend);
-    const conversionValue = campaign.metrics.conversions_value;
-    const conversions = campaign.metrics.conversions;
-    const clicks = campaign.metrics.clicks;
+    const conversionValue = campaigns.metrics.conversions_value;
+    const conversions = campaigns.metrics.conversions;
+    const clicks = campaigns.metrics.clicks;
     const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
     const roiPercent = roundNumber<number>(roi * 100);
     const conversionRates = clicks > 0 ? conversions / clicks : 0;
     const conversionRatePercent = roundNumber<number>(conversionRates * 100);
-    const ctrPercent = campaign.metrics.ctr
-      ? roundNumber<number>(campaign.metrics.ctr * 100)
-      : campaign.metrics.ctr;
+    const ctrPercent = campaigns.metrics.ctr
+      ? roundNumber<number>(campaigns.metrics.ctr * 100)
+      : campaigns.metrics.ctr;
     const spendFieldName = `spend_${currencyCode}`;
 
     return {
-      impressions: campaign.metrics.impressions,
+      impressions: campaigns.metrics.impressions,
       [spendFieldName]: roundedSpend,
       conversion_rate_percent: conversionRatePercent,
       ctr_percent: ctrPercent,
@@ -321,10 +197,10 @@ export class GoogleAdsService {
     return currencyCode;
   }
 
-  async getOverallCampaigns(dto: GetOverallCampaignsDto, clientId: string) {
+  async getOverall(dto: GetOverallDto, clientId: string) {
     const customer = await this.getCustomer(clientId);
 
-    const campaign = await this.fetchGetOverallCampaigns(
+    const campaigns = await this.fetchGetOverall(
       customer,
       dto.start_date,
       dto.end_date,
@@ -332,19 +208,16 @@ export class GoogleAdsService {
 
     const currencyCode = await this.getCurrencyCode(customer);
 
-    const formattedCampaigns = this.formatGetOverallCampaigns(
-      campaign,
-      currencyCode,
-    );
+    const formattedCampaigns = this.formatGetOverall(campaigns, currencyCode);
     return formattedCampaigns;
   }
 
-  private async fetchGetDailyCampaigns(
+  private async fetchGetDaily(
     customer: Customer,
     startDate: string,
     endDate: string,
   ) {
-    return await customer.report({
+    const campaigns = await customer.report({
       entity: 'customer',
       metrics: [
         'metrics.clicks',
@@ -364,13 +237,15 @@ export class GoogleAdsService {
       from_date: startDate,
       to_date: endDate,
     });
+
+    return campaigns;
   }
 
-  private formatGetDailyCampaigns(
+  private formatGetDaily(
     campaigns: services.IGoogleAdsRow[],
     currencyCode: string,
   ) {
-    const allCampaigns = campaigns.map((campaign) => {
+    const formattedCampaigns = campaigns.map((campaign) => {
       const spend = campaign.metrics.cost_micros / 1000000;
       const roundedSpend = roundNumber<number>(spend);
       const conversionValue = campaign.metrics.conversions_value;
@@ -396,13 +271,13 @@ export class GoogleAdsService {
       };
     });
 
-    return allCampaigns;
+    return formattedCampaigns;
   }
 
-  async getDailyCampaigns(dto: GetDailyCampaignsDto, clientId: string) {
+  async getDaily(dto: GetDailyDto, clientId: string) {
     const customer = await this.getCustomer(clientId);
 
-    const campaigns = await this.fetchGetDailyCampaigns(
+    const campaigns = await this.fetchGetDaily(
       customer,
       dto.start_date,
       dto.end_date,
@@ -414,10 +289,7 @@ export class GoogleAdsService {
 
     const currencyCode = await this.getCurrencyCode(customer);
 
-    const formattedCampaigns = this.formatGetDailyCampaigns(
-      campaigns,
-      currencyCode,
-    );
+    const formattedCampaigns = this.formatGetDaily(campaigns, currencyCode);
     return formattedCampaigns;
   }
 
@@ -426,7 +298,7 @@ export class GoogleAdsService {
     startDate: string,
     endDate: string,
   ) {
-    return await customer.query(`
+    const campaigns = await customer.query(`
       SELECT
         campaign.name,
         campaign.status,
@@ -442,13 +314,15 @@ export class GoogleAdsService {
         AND segments.date BETWEEN '${startDate}' AND '${endDate}'
       ORDER BY metrics.impressions DESC
     `);
+
+    return campaigns;
   }
 
   private formatGetCampaigns(
     campaigns: services.IGoogleAdsRow[],
     currencyCode: string,
   ) {
-    const allCampaigns = campaigns.map((campaign) => {
+    const formattedCampaigns = campaigns.map((campaign) => {
       const id = campaign.campaign.resource_name.split('/')[3];
       const status = enums.CampaignStatus[campaign.campaign.status];
       const spend = campaign.metrics.cost_micros / 1000000;
@@ -480,7 +354,7 @@ export class GoogleAdsService {
       };
     });
 
-    return allCampaigns;
+    return formattedCampaigns;
   }
 
   async getCampaigns(dto: GetCampaignsDto, clientId: string) {
@@ -500,5 +374,92 @@ export class GoogleAdsService {
 
     const formattedCampaigns = this.formatGetCampaigns(campaigns, currencyCode);
     return formattedCampaigns;
+  }
+
+  private async fetchGetCampaignById(
+    customer: Customer,
+    startDate: string,
+    endDate: string,
+    campaignId: string,
+  ) {
+    const campaign = await customer.query(`
+      SELECT
+        campaign.name,
+        campaign.status,
+        metrics.clicks,
+        metrics.impressions,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value,
+        metrics.ctr,
+        segments.date
+      FROM campaign
+      WHERE campaign.id = ${campaignId}
+        AND campaign.status IN ('ENABLED', 'PAUSED')
+        AND segments.date BETWEEN '${startDate}' AND '${endDate}'
+      ORDER BY segments.date ASC
+    `);
+
+    return campaign;
+  }
+
+  private formatGetCampaignById(
+    campaigns: services.IGoogleAdsRow[],
+    currencyCode: string,
+  ) {
+    const formattedCampaign = campaigns.map((campaign) => {
+      const spend = campaign.metrics.cost_micros / 1000000;
+      const roundedSpend = roundNumber<number>(spend);
+      const conversionValue = campaign.metrics.conversions_value;
+      const conversions = campaign.metrics.conversions;
+      const clicks = campaign.metrics.clicks;
+      const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
+      const roiPercent = roundNumber<number>(roi * 100);
+      const conversionRates = clicks > 0 ? conversions / clicks : 0;
+      const conversionRatePercent = roundNumber<number>(conversionRates * 100);
+      const ctrPercent = campaign.metrics.ctr
+        ? roundNumber<number>(campaign.metrics.ctr * 100)
+        : campaign.metrics.ctr;
+
+      const spendFieldName = `spend_${currencyCode}`;
+
+      return {
+        date: campaign.segments.date,
+        impressions: campaign.metrics.impressions,
+        [spendFieldName]: roundedSpend,
+        conversion_rate_percent: conversionRatePercent,
+        ctr_percent: ctrPercent,
+        roi_percent: roiPercent,
+      };
+    });
+
+    return formattedCampaign;
+  }
+
+  async getCampaignById(
+    dto: GetCampaignByIdDto,
+    campaignId: string,
+    clientId: string,
+  ) {
+    const customer = await this.getCustomer(clientId);
+
+    const campaign = await this.fetchGetCampaignById(
+      customer,
+      dto.start_date,
+      dto.end_date,
+      campaignId,
+    );
+
+    // Case when data not found
+    const hasData = campaign?.length > 0;
+    if (!hasData) return [] as string[];
+
+    const currencyCode = await this.getCurrencyCode(customer);
+
+    const formattedCampaign = this.formatGetCampaignById(
+      campaign,
+      currencyCode,
+    );
+    return formattedCampaign;
   }
 }

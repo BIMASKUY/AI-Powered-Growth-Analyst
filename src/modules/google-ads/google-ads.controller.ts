@@ -5,9 +5,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 // import { AuthGuard } from '../auth/guards/auth.guard';
 // import { Auth } from '../common/decorator/auth.decorator';
 // import { AuthUser } from '../common/types/types';
-import { GetOverallCampaignsDto } from './dto/get-overall-campaigns.dto';
-import { GetDailyCampaignsDto } from './dto/get-daily-campaigns.dto';
+import { GetOverallDto } from './dto/get-overall.dto';
+import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';
+import { GetCampaignByIdDto } from './dto/get-campaign-by-id.dto';
 
 // @ApiBearerAuth()
 // @UseGuards(AuthGuard)
@@ -16,34 +17,28 @@ import { GetCampaignsDto } from './dto/get-campaigns.dto';
 export class GoogleAdsController {
   constructor(private readonly googleAdsService: GoogleAdsService) {}
 
-  @ApiOperation({ summary: 'Get google ads overall campaigns' })
-  @Get('overall-campaigns')
-  async getOverallCampaigns(
+  @ApiOperation({ summary: 'Get google ads overall' })
+  @Get('overall')
+  async getOverall(
     // @Auth() user: AuthUser,
-    @Query() dto: GetOverallCampaignsDto,
+    @Query() dto: GetOverallDto,
   ) {
-    const data = await this.googleAdsService.getOverallCampaigns(
-      dto,
-      'test-client-id',
-    );
-    const message = 'google ads overall campaigns fetched successfully';
+    const data = await this.googleAdsService.getOverall(dto, 'test-client-id');
+    const message = 'google ads overall fetched successfully';
     return {
       message,
       data,
     };
   }
 
-  @ApiOperation({ summary: 'Get google ads daily campaigns' })
-  @Get('daily-campaigns')
-  async getDailyCampaigns(
+  @ApiOperation({ summary: 'Get google ads daily' })
+  @Get('daily')
+  async getDaily(
     // @Auth() user: AuthUser,
-    @Query() dto: GetDailyCampaignsDto,
+    @Query() dto: GetDailyDto,
   ) {
-    const data = await this.googleAdsService.getDailyCampaigns(
-      dto,
-      'test-client-id',
-    );
-    const message = 'google ads daily campaigns fetched successfully';
+    const data = await this.googleAdsService.getDaily(dto, 'test-client-id');
+    const message = 'google ads daily fetched successfully';
     return {
       message,
       data,
@@ -67,25 +62,22 @@ export class GoogleAdsController {
     };
   }
 
-  // @ApiOperation({ summary: 'Get google ads campaign by id' })
-  // @Get('ads/campaigns/:campaign_id')
-  // async getCampaignById(
-  //   @Auth() user: AuthUser,
-  //   @Query() query: GetCampaignByIdQueryDto,
-  //   @Param() param: GetCampaignByIdParamsDto,
-  // ) {
-  //   const { pagination, analysis, data } =
-  //     await this.googleAdsService.getCampaignById(
-  //       query,
-  //       param.campaign_id,
-  //       user.user_metadata.client_id,
-  //     );
-  //   const message = 'google ads campaign by id fetched successfully';
-  //   return {
-  //     message,
-  //     pagination,
-  //     analysis,
-  //     data,
-  //   };
-  // }
+  @ApiOperation({ summary: 'Get google ads campaign by id' })
+  @Get('campaigns/:campaign_id')
+  async getCampaignById(
+    // @Auth() user: AuthUser,
+    @Query() dto: GetCampaignByIdDto,
+    @Param('campaign_id') campaign_id: string,
+  ) {
+    const data = await this.googleAdsService.getCampaignById(
+      dto,
+      campaign_id,
+      'test-client-id',
+    );
+    const message = 'google ads campaign by id fetched successfully';
+    return {
+      message,
+      data,
+    };
+  }
 }

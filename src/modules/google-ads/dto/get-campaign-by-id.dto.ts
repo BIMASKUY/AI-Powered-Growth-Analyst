@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class GetOverallCampaignsDto {
+export class GetCampaignByIdDto {
   @ApiProperty({
     example: '2023-01-01',
   })
