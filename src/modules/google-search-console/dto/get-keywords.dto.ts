@@ -9,13 +9,13 @@ import {
 import { Transform, Type } from 'class-transformer';
 
 export class GetKeywordsDto {
-  @IsDateString()
+  @IsDateString({ strict: true })
   @ApiProperty({
     example: '2025-01-01',
   })
   start_date: string;
 
-  @IsDateString()
+  @IsDateString({ strict: true })
   @ApiProperty({
     example: '2025-01-31',
   })
@@ -39,7 +39,8 @@ export class GetKeywordsDto {
   })
   @ApiPropertyOptional({
     default: '',
-    description: 'Filter keywords contain this search term (case insensitive)',
+    example: 'bmw',
+    description: 'filter keywords contain this search term (case insensitive)',
   })
   search: string = '';
 }

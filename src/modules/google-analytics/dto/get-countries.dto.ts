@@ -16,7 +16,7 @@ export class GetCountriesDto {
   start_date: string;
 
   @IsDateString({ strict: true })
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2025-01-31',
   })
   end_date: string;
@@ -42,5 +42,5 @@ export class GetCountriesDto {
     example: 'es',
     description: 'filter countries contain this search term (case insensitive)',
   })
-  search: string;
+  search: string = '';
 }

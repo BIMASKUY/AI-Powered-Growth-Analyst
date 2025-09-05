@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -8,11 +8,15 @@ import { Injectable, HttpException, Logger } from '@nestjs/common';
 import { analyticsdata_v1beta, google } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
 import { GetOverallDto } from './dto/get-overall.dto';
-import { roundNumber } from 'src/utils/global.utils';
+import { formatDate, roundNumber } from 'src/utils/global.utils';
 import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
 import { GetDailyDto } from './dto/get-daily.dto';
-import { parse, format } from 'date-fns';
 import { GetPagesDto } from './dto/get-pages.dto';
+import { GetByPageDto } from './dto/get-by-page.dto';
+import { GetCountriesDto } from './dto/get-countries.dto';
+import { GetByCountryDto } from './dto/get-by-country.dto';
+import { GetOverallOrganicDto } from './dto/get-overall-organic.dto';
+import { GetDailyOrganicDto } from './dto/get-daily-organic.dto';
 
 @Injectable()
 export class GoogleAnalyticsService {
@@ -157,11 +161,11 @@ export class GoogleAnalyticsService {
   }
 
   private formatGetOverall(
-    data: analyticsdata_v1beta.Schema$RunReportResponse,
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
   ) {
-    const metricValues = data.rows[0].metricValues;
-    const bounceRate = roundNumber<string>(metricValues[2].value);
-    const bounceRatePercent = bounceRate * 100;
+    const metricValues = rawData.rows[0].metricValues;
+    const bounceRate = Number(metricValues[2].value);
+    const bounceRatePercent = roundNumber<number>(bounceRate * 100);
 
     return {
       sessions: Number(metricValues[0].value),
@@ -178,7 +182,7 @@ export class GoogleAnalyticsService {
   async getOverall(dto: GetOverallDto, clientId: string) {
     const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-    const overallData = await this.fetchGetOverall(
+    const rawData = await this.fetchGetOverall(
       analytics,
       propertyId,
       dto.start_date,
@@ -186,12 +190,12 @@ export class GoogleAnalyticsService {
     );
 
     // Case when data not found
-    const hasData = overallData?.rowCount > 0;
+    const hasData = rawData?.rowCount > 0;
     if (!hasData) return {};
 
-    const overallFormattedData = this.formatGetOverall(overallData);
+    const formattedData = this.formatGetOverall(rawData);
 
-    return overallFormattedData;
+    return formattedData;
   }
 
   private async fetchGetDaily(
@@ -228,18 +232,15 @@ export class GoogleAnalyticsService {
   }
 
   private formatGetDaily(
-    allData: analyticsdata_v1beta.Schema$RunReportResponse,
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
   ) {
-    const { rows: allRowsData } = allData;
+    const { rows } = rawData;
 
-    const formattedData = allRowsData.map((row) => {
+    const formattedData = rows.map((row) => {
       const rawDate = row.dimensionValues[0].value;
-      const formattedDate = format(
-        parse(rawDate, 'yyyyMMdd', new Date()),
-        'yyyy-MM-dd',
-      );
-      const bounceRate = roundNumber<string>(row.metricValues[2].value);
-      const bounceRatePercent = bounceRate * 100;
+      const formattedDate = formatDate(rawDate);
+      const bounceRate = Number(row.metricValues[2].value);
+      const bounceRatePercent = roundNumber<number>(bounceRate * 100);
 
       return {
         date: formattedDate,
@@ -259,7 +260,7 @@ export class GoogleAnalyticsService {
   async getDaily(dto: GetDailyDto, clientId: string) {
     const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-    const allData = await this.fetchGetDaily(
+    const rawData = await this.fetchGetDaily(
       analytics,
       propertyId,
       dto.start_date,
@@ -267,420 +268,233 @@ export class GoogleAnalyticsService {
     );
 
     // Case when data not found
-    const isTotalDataAvailable = allData?.rowCount > 0;
-    if (!isTotalDataAvailable) return [] as string[];
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return [] as string[];
 
-    const formattedData = this.formatGetDaily(allData);
+    const formattedData = this.formatGetDaily(rawData);
 
     return formattedData;
   }
 
-  // private async fetchGetByCountries(
-  //   analytics: analyticsdata_v1beta.Analyticsdata,
-  //   propertyId: string,
-  //   startDate: string,
-  //   endDate: string,
-  //   orderBy: boolean,
-  //   search: string,
-  // ) {
-  //   try {
-  //     const [allRawDataWithFilter, allRawData] = await Promise.all([
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'country' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               metric: { metricName: 'sessions' },
-  //               desc: orderBy,
-  //             },
-  //           ],
-  //           dimensionFilter: {
-  //             filter: {
-  //               fieldName: 'country',
-  //               stringFilter: {
-  //                 matchType: 'CONTAINS',
-  //                 value: search,
-  //                 caseSensitive: false,
-  //               },
-  //             },
-  //           },
-  //           // removed because filters need pagination manually
-  //           // limit: limit.toString(),
-  //           // offset: offset.toString(),
-  //         },
-  //       }),
+  private async fetchGetCountries(
+    analytics: analyticsdata_v1beta.Analyticsdata,
+    propertyId: string,
+    startDate: string,
+    endDate: string,
+    limit: number,
+    search: string,
+  ) {
+    try {
+      const { data } = await analytics.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dimensions: [{ name: 'country' }],
+          dateRanges: [{ startDate, endDate }],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+            { name: 'averageSessionDuration' },
+            { name: 'activeUsers' },
+          ],
+          orderBys: [
+            {
+              metric: { metricName: 'activeUsers' },
+              desc: true,
+            },
+          ],
+          dimensionFilter: {
+            filter: {
+              fieldName: 'country',
+              stringFilter: {
+                matchType: 'CONTAINS',
+                value: search,
+                caseSensitive: false,
+              },
+            },
+          },
+          limit: limit.toString(),
+        },
+      });
 
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'country' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               metric: { metricName: 'sessions' },
-  //               desc: true,
-  //             },
-  //           ],
-  //         },
-  //       }),
-  //     ]);
+      return data;
+    } catch (error) {
+      Logger.error(error.message, 'GoogleAnalyticsService');
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  //     const { data: allDataWithFilter } = allRawDataWithFilter;
-  //     const { data: allData } = allRawData;
+  private formatGetCountries(
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
+  ) {
+    const { rows } = rawData;
 
-  //     return {
-  //       allDataWithFilter,
-  //       allData,
-  //     };
-  //   } catch (error) {
-  //     Logger.error(error.message, 'GoogleAnalyticsService');
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+    const formattedData = rows.map((row) => {
+      const bounceRate = Number(row.metricValues[2].value);
+      const bounceRatePercent = roundNumber<number>(bounceRate * 100);
 
-  // private formatGetByCountries(
-  //   allDataWithFilter: analyticsdata_v1beta.Schema$RunReportResponse,
-  //   allData: analyticsdata_v1beta.Schema$RunReportResponse,
-  //   limit: number,
-  //   offset: number,
-  // ) {
-  //   const { rows: allRowsDataWithFilter } = allDataWithFilter;
-  //   const { rows: allRowsData } = allData;
+      return {
+        country: row.dimensionValues[0].value,
+        sessions: Number(row.metricValues[0].value),
+        screen_page_views: Number(row.metricValues[1].value),
+        bounce_rate_percent: bounceRatePercent,
+        average_session_duration_seconds: roundNumber<string>(
+          row.metricValues[3].value,
+        ),
+        active_users: Number(row.metricValues[4].value),
+      };
+    });
 
-  //   const paginatioRowsData = allRowsDataWithFilter.slice(
-  //     offset,
-  //     offset + limit,
-  //   );
+    return formattedData;
+  }
 
-  //   const paginationFormattedData = paginatioRowsData.map((item) => {
-  //     return {
-  //       country: item.dimensionValues[0].value,
-  //       sessions: Number(item.metricValues[0].value),
-  //       screen_page_views: Number(item.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(item.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         item.metricValues[3].value,
-  //       ),
-  //       active_users: Number(item.metricValues[4].value),
-  //     };
-  //   });
+  async getCountries(dto: GetCountriesDto, clientId: string) {
+    // Check cache first (the cache is only for query without search)
+    // const cachedData = await this.redisService.get(
+    //   clientId,
+    //   this.SERVICE_NAME,
+    //   'get-by-countries',
+    //   query.start_date,
+    //   query.end_date,
+    //   true,
+    //   query.order_by,
+    //   query.limit,
+    //   query.page,
+    // );
+    // if (cachedData && !query.search) return cachedData as GetByCountries;
 
-  //   const allFormattedData = allRowsData.map((row) => {
-  //     return {
-  //       country: row.dimensionValues[0].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
+    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedData,
-  //   };
-  // }
+    const rawData = await this.fetchGetCountries(
+      analytics,
+      propertyId,
+      dto.start_date,
+      dto.end_date,
+      dto.limit,
+      dto.search,
+    );
 
-  // async getByCountries(
-  //   query: GetByCountriesQueryDto,
-  //   clientId: string,
-  // ): Promise<GetByCountries | PaginationServiceAiDataNotFound> {
-  //   query = GoogleAnalyticsValidation.getByCountriesQuery.parse(
-  //     query,
-  //   ) as GetByCountriesQueryDto;
+    // Case when data not found
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return [] as string[];
 
-  //   // Check cache first (the cache is only for query without search)
-  //   const cachedData = await this.redisService.get(
-  //     clientId,
-  //     this.SERVICE_NAME,
-  //     'get-by-countries',
-  //     query.start_date,
-  //     query.end_date,
-  //     true,
-  //     query.order_by,
-  //     query.limit,
-  //     query.page,
-  //   );
-  //   if (cachedData && !query.search) return cachedData as GetByCountries;
+    const formattedData = this.formatGetCountries(rawData);
 
-  //   const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+    // Save cache to redis (only for query without search)
+    // if (!query.search) {
+    //   await this.redisService.add(
+    //     {
+    //       clientId,
+    //       service: this.SERVICE_NAME,
+    //       method: 'get-by-countries',
+    //       startDate: query.start_date,
+    //       endDate: query.end_date,
+    //       withAnalysis: true,
+    //       orderBy: query.order_by,
+    //       limit: query.limit,
+    //       page: query.page,
+    //     },
+    //     {
+    //       data: paginationFormattedData,
+    //       pagination: paginationInfo,
+    //       analysis,
+    //     },
+    //   );
+    // }
 
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
+    return formattedData;
+  }
 
-  //   const { allDataWithFilter, allData } = await this.fetchGetByCountries(
-  //     analytics,
-  //     propertyId,
-  //     query.start_date,
-  //     query.end_date,
-  //     orderBy,
-  //     query.search,
-  //   );
+  private async fetchGetByCountry(
+    analytics: analyticsdata_v1beta.Analyticsdata,
+    propertyId: string,
+    startDate: string,
+    endDate: string,
+    country: string,
+  ) {
+    try {
+      const { data } = await analytics.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dimensions: [{ name: 'country' }, { name: 'date' }],
+          dateRanges: [{ startDate, endDate }],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+            { name: 'averageSessionDuration' },
+            { name: 'activeUsers' },
+          ],
+          orderBys: [
+            {
+              dimension: { dimensionName: 'date' },
+              desc: false,
+            },
+          ],
+          dimensionFilter: {
+            filter: {
+              fieldName: 'country',
+              stringFilter: {
+                value: country,
+              },
+            },
+          },
+          // limit: limit.toString(),
+          // offset: offset.toString(),
+        },
+      });
 
-  //   // Case when data not found
-  //   const isTotalDataWithFilterAvailable = allDataWithFilter?.rowCount > 0; // get all data with filter search keywords
-  //   const totalDataWithFilter = isTotalDataWithFilterAvailable
-  //     ? allDataWithFilter.rowCount
-  //     : 0;
-  //   const isPaginationDataAvailable = isTotalDataWithFilterAvailable
-  //     ? totalDataWithFilter > offset
-  //     : false;
+      return data;
+    } catch (error) {
+      Logger.error(error.message, 'GoogleAnalyticsService');
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  //   if (!isPaginationDataAvailable) {
-  //     return {
-  //       pagination: pagination(totalDataWithFilter, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
+  private formatGetByCountry(
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
+  ) {
+    const { rows } = rawData;
 
-  //   const { paginationFormattedData, allFormattedData } =
-  //     this.formatGetByCountries(
-  //       allDataWithFilter,
-  //       allData,
-  //       query.limit,
-  //       offset,
-  //     );
+    const formattedData = rows.map((row) => {
+      const rawDate = row.dimensionValues[1].value;
+      const formattedDate = formatDate(rawDate);
+      const bounceRate = Number(row.metricValues[2].value);
+      const bounceRatePercent = roundNumber<number>(bounceRate * 100);
+      return {
+        date: formattedDate,
+        sessions: Number(row.metricValues[0].value),
+        screen_page_views: Number(row.metricValues[1].value),
+        bounce_rate_percent: bounceRatePercent,
+        average_session_duration_seconds: roundNumber<string>(
+          row.metricValues[3].value,
+        ),
+        active_users: Number(row.metricValues[4].value),
+      };
+    });
 
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedData,
-  //     'Provides data-driven google analytics countries data analysis with specific recommendations based on the dataset.',
-  //   );
+    return formattedData;
+  }
 
-  //   const paginationInfo = pagination(
-  //     totalDataWithFilter,
-  //     query.page,
-  //     query.limit,
-  //   );
+  async getByCountry(dto: GetByCountryDto, country: string, clientId: string) {
+    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-  //   // Save cache to redis (only for query without search)
-  //   if (!query.search) {
-  //     await this.redisService.add(
-  //       {
-  //         clientId,
-  //         service: this.SERVICE_NAME,
-  //         method: 'get-by-countries',
-  //         startDate: query.start_date,
-  //         endDate: query.end_date,
-  //         withAnalysis: true,
-  //         orderBy: query.order_by,
-  //         limit: query.limit,
-  //         page: query.page,
-  //       },
-  //       {
-  //         data: paginationFormattedData,
-  //         pagination: paginationInfo,
-  //         analysis,
-  //       },
-  //     );
-  //   }
+    const rawData = await this.fetchGetByCountry(
+      analytics,
+      propertyId,
+      dto.start_date,
+      dto.end_date,
+      country,
+    );
 
-  //   return {
-  //     pagination: paginationInfo,
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
+    // Case when data not found
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return [] as string[];
 
-  // private async fetchGetByCountry(
-  //   analytics: analyticsdata_v1beta.Analyticsdata,
-  //   propertyId: string,
-  //   startDate: string,
-  //   endDate: string,
-  //   orderBy: boolean,
-  //   limit: number,
-  //   offset: number,
-  //   country: string,
-  // ) {
-  //   try {
-  //     const [paginationRawData, allRawData] = await Promise.all([
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'country' }, { name: 'date' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               dimension: { dimensionName: 'date' },
-  //               desc: orderBy,
-  //             },
-  //           ],
-  //           dimensionFilter: {
-  //             filter: {
-  //               fieldName: 'country',
-  //               stringFilter: {
-  //                 value: country,
-  //               },
-  //             },
-  //           },
-  //           limit: limit.toString(),
-  //           offset: offset.toString(),
-  //         },
-  //       }),
+    const formattedData = this.formatGetByCountry(rawData);
 
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'country' }, { name: 'date' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               dimension: { dimensionName: 'date' },
-  //               desc: true,
-  //             },
-  //           ],
-  //           dimensionFilter: {
-  //             filter: {
-  //               fieldName: 'country',
-  //               stringFilter: {
-  //                 value: country,
-  //               },
-  //             },
-  //           },
-  //         },
-  //       }),
-  //     ]);
-
-  //     const { data: paginationData } = paginationRawData;
-  //     const { data: allData } = allRawData;
-
-  //     return {
-  //       paginationData,
-  //       allData,
-  //     };
-  //   } catch (error) {
-  //     Logger.error(error.message, 'GoogleAnalyticsService');
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
-
-  // private formatGetByCountry(
-  //   paginationData: analyticsdata_v1beta.Schema$RunReportResponse,
-  //   allData: analyticsdata_v1beta.Schema$RunReportResponse,
-  // ) {
-  //   const { rows: paginationRowsData } = paginationData;
-  //   const { rows: allRowsData } = allData;
-
-  //   const paginationFormattedData = paginationRowsData.map((row) => {
-  //     return {
-  //       date: row.dimensionValues[1].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
-
-  //   const allFormattedData = allRowsData.map((row) => {
-  //     return {
-  //       date: row.dimensionValues[1].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
-
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedData,
-  //   };
-  // }
-
-  // async getByCountry(
-  //   query: GetByCountryQueryDto,
-  //   clientId: string,
-  //   country: string,
-  // ) {
-  //   query = GoogleAnalyticsValidation.getByCountryQuery.parse(
-  //     query,
-  //   ) as GetByCountryQueryDto;
-
-  //   country = GoogleAnalyticsValidation.getByCountryParam.parse(country);
-
-  //   const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
-
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
-
-  //   const { paginationData, allData } = await this.fetchGetByCountry(
-  //     analytics,
-  //     propertyId,
-  //     query.start_date,
-  //     query.end_date,
-  //     orderBy,
-  //     query.limit,
-  //     offset,
-  //     country,
-  //   );
-
-  //   // Case when data not found
-  //   const isTotalDataAvailable = allData?.rowCount > 0;
-  //   const totalData = isTotalDataAvailable ? allData.rowCount : 0;
-  //   const isPaginationDataAvailable = paginationData?.rows?.length > 0;
-  //   if (!isPaginationDataAvailable) {
-  //     return {
-  //       pagination: pagination(totalData, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
-
-  //   const { paginationFormattedData, allFormattedData } =
-  //     this.formatGetByCountry(paginationData, allData);
-
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedData,
-  //     'Provides data-driven google analytics country for each date analysis with specific recommendations based on the dataset.',
-  //   );
-
-  //   return {
-  //     pagination: pagination(totalData, query.page, query.limit),
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
+    return formattedData;
+  }
 
   private async fetchGetPages(
     analytics: analyticsdata_v1beta.Analyticsdata,
@@ -694,7 +508,7 @@ export class GoogleAnalyticsService {
       const { data } = await analytics.properties.runReport({
         property: `properties/${propertyId}`,
         requestBody: {
-          dimensions: [{ name: 'fullPageUrl' }, { name: 'pageTitle' }],
+          dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
           dateRanges: [{ startDate, endDate }],
           metrics: [
             { name: 'sessions' },
@@ -705,13 +519,13 @@ export class GoogleAnalyticsService {
           ],
           orderBys: [
             {
-              metric: { metricName: 'sessions' },
+              metric: { metricName: 'activeUsers' },
               desc: true,
             },
           ],
           dimensionFilter: {
             filter: {
-              fieldName: 'fullPageUrl',
+              fieldName: 'pagePath',
               stringFilter: {
                 matchType: 'CONTAINS',
                 value: search,
@@ -731,13 +545,13 @@ export class GoogleAnalyticsService {
   }
 
   private formatGetPages(
-    allData: analyticsdata_v1beta.Schema$RunReportResponse,
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
   ) {
-    const { rows: allRowsData } = allData;
+    const { rows } = rawData;
 
-    const allFormattedData = allRowsData.map((row) => {
-      const bounceRate = roundNumber<string>(row.metricValues[2].value);
-      const bounceRatePercent = bounceRate * 100;
+    const formattedData = rows.map((row) => {
+      const bounceRate = Number(row.metricValues[2].value);
+      const bounceRatePercent = roundNumber<number>(bounceRate * 100);
 
       return {
         page: row.dimensionValues[0].value,
@@ -752,13 +566,13 @@ export class GoogleAnalyticsService {
       };
     });
 
-    return allFormattedData;
+    return formattedData;
   }
 
   async getPages(dto: GetPagesDto, clientId: string) {
     const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-    const allData = await this.fetchGetPages(
+    const rawData = await this.fetchGetPages(
       analytics,
       propertyId,
       dto.start_date,
@@ -768,518 +582,329 @@ export class GoogleAnalyticsService {
     );
 
     // Case when data not found
-    const isTotalDataWithFilterAvailable = allData?.rowCount > 0;
-    if (!isTotalDataWithFilterAvailable) return [] as string[];
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return [] as string[];
 
-    const formattedData = this.formatGetPages(allData);
+    const formattedData = this.formatGetPages(rawData);
 
     return formattedData;
   }
 
-  // private async fetchGetByPage(
-  //   analytics: analyticsdata_v1beta.Analyticsdata,
-  //   propertyId: string,
-  //   startDate: string,
-  //   endDate: string,
-  //   orderBy: boolean,
-  //   limit: number,
-  //   offset: number,
-  //   page: string,
-  // ) {
-  //   try {
-  //     const [paginationRawData, allRawData] = await Promise.all([
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'fullPageUrl' }, { name: 'date' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               dimension: { dimensionName: 'date' },
-  //               desc: orderBy,
-  //             },
-  //           ],
-  //           dimensionFilter: {
-  //             filter: {
-  //               fieldName: 'fullPageUrl',
-  //               stringFilter: {
-  //                 value: page,
-  //               },
-  //             },
-  //           },
-  //           limit: limit.toString(),
-  //           offset: offset.toString(),
-  //         },
-  //       }),
+  private async fetchGetByPage(
+    analytics: analyticsdata_v1beta.Analyticsdata,
+    propertyId: string,
+    startDate: string,
+    endDate: string,
+    page: string,
+  ) {
+    try {
+      const { data } = await analytics.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dimensions: [{ name: 'pagePath' }, { name: 'date' }],
+          dateRanges: [{ startDate, endDate }],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+            { name: 'averageSessionDuration' },
+            { name: 'activeUsers' },
+          ],
+          orderBys: [
+            {
+              dimension: { dimensionName: 'date' },
+              desc: false,
+            },
+          ],
+          dimensionFilter: {
+            filter: {
+              fieldName: 'pagePath',
+              stringFilter: {
+                value: page,
+              },
+            },
+          },
+        },
+      });
 
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'fullPageUrl' }, { name: 'date' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               dimension: { dimensionName: 'date' },
-  //               desc: true,
-  //             },
-  //             {
-  //               metric: { metricName: 'sessions' },
-  //               desc: true,
-  //             },
-  //           ],
-  //           dimensionFilter: {
-  //             filter: {
-  //               fieldName: 'fullPageUrl',
-  //               stringFilter: {
-  //                 value: page,
-  //               },
-  //             },
-  //           },
-  //         },
-  //       }),
-  //     ]);
+      return data;
+    } catch (error) {
+      Logger.error(error.message, 'GoogleAnalyticsService');
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  //     const { data: paginationData } = paginationRawData;
-  //     const { data: allData } = allRawData;
+  private formatGetByPage(
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
+  ) {
+    const { rows } = rawData;
 
-  //     return {
-  //       paginationData,
-  //       allData,
-  //     };
-  //   } catch (error) {
-  //     Logger.error(error.message, 'GoogleAnalyticsService');
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+    const formattedData = rows.map((row) => {
+      const rawDate = row.dimensionValues[1].value;
+      const formattedDate = formatDate(rawDate);
+      const bounceRate = Number(row.metricValues[2].value);
+      const bounceRatePercent = roundNumber<number>(bounceRate * 100);
 
-  // private formatGetByPage(
-  //   paginationData: analyticsdata_v1beta.Schema$RunReportResponse,
-  //   allData: analyticsdata_v1beta.Schema$RunReportResponse,
-  // ) {
-  //   const { rows: paginationRowsData } = paginationData;
-  //   const { rows: allRowsData } = allData;
+      return {
+        date: formattedDate,
+        sessions: Number(row.metricValues[0].value),
+        screen_page_views: Number(row.metricValues[1].value),
+        bounce_rate_percent: bounceRatePercent,
+        average_session_duration_seconds: roundNumber<string>(
+          row.metricValues[3].value,
+        ),
+        active_users: Number(row.metricValues[4].value),
+      };
+    });
 
-  //   const paginationFormattedData = paginationRowsData.map((row) => {
-  //     return {
-  //       date: row.dimensionValues[1].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
+    return formattedData;
+  }
 
-  //   const allFormattedData = allRowsData.map((row) => {
-  //     return {
-  //       date: row.dimensionValues[1].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
+  async getByPage(query: GetByPageDto, page: string, clientId: string) {
+    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedData,
-  //   };
-  // }
+    const rawData = await this.fetchGetByPage(
+      analytics,
+      propertyId,
+      query.start_date,
+      query.end_date,
+      page,
+    );
 
-  // async getByPage(query: GetByPageQueryDto, clientId: string, page: string) {
-  //   query = GoogleAnalyticsValidation.getByPageQuery.parse(
-  //     query,
-  //   ) as GetByPageQueryDto;
+    // Case when data not found
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return [] as string[];
 
-  //   page = GoogleAnalyticsValidation.getByPageParam.parse(page);
+    const formattedData = this.formatGetByPage(rawData);
+    return formattedData;
+  }
 
-  //   const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  private async fetchGetOverallOrganic(
+    analytics: analyticsdata_v1beta.Analyticsdata,
+    propertyId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    try {
+      const { data } = await analytics.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dimensions: [{ name: 'sessionMedium' }],
+          dateRanges: [{ startDate, endDate }],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+            { name: 'averageSessionDuration' },
+            { name: 'activeUsers' },
+          ],
+          dimensionFilter: {
+            andGroup: {
+              expressions: [
+                {
+                  filter: {
+                    fieldName: 'sessionMedium',
+                    stringFilter: {
+                      matchType: 'EXACT',
+                      value: 'organic',
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      });
 
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
+      return data;
+    } catch (error) {
+      Logger.error(error.message, 'GoogleAnalyticsService');
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  //   const { paginationData, allData } = await this.fetchGetByPage(
-  //     analytics,
-  //     propertyId,
-  //     query.start_date,
-  //     query.end_date,
-  //     orderBy,
-  //     query.limit,
-  //     offset,
-  //     page,
-  //   );
+  private formatGetOverallOrganic(
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
+  ) {
+    const metricValues = rawData.rows[0].metricValues;
+    const bounceRate = Number(metricValues[2].value);
+    const bounceRatePercent = roundNumber<number>(bounceRate * 100);
 
-  //   // Case when data not found
-  //   const isTotalDataAvailable = allData?.rowCount > 0;
-  //   const totalData = isTotalDataAvailable ? allData.rowCount : 0;
-  //   const isPaginationDataAvailable = paginationData?.rows?.length > 0;
-  //   if (!isPaginationDataAvailable) {
-  //     return {
-  //       pagination: pagination(totalData, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
+    return {
+      sessions: Number(metricValues[0].value),
+      screen_page_views: Number(metricValues[1].value),
+      bounce_rate_percent: bounceRatePercent,
+      average_session_duration_seconds: roundNumber<string>(
+        metricValues[3].value,
+      ),
+      active_users: Number(metricValues[4].value),
+    };
+  }
 
-  //   const { paginationFormattedData, allFormattedData } = this.formatGetByPage(
-  //     paginationData,
-  //     allData,
-  //   );
+  // Organic traffic refers to the visitors who arrive at a website through unpaid search results
+  async getOverallOrganic(dto: GetOverallOrganicDto, clientId: string) {
+    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedData,
-  //     'Provides data-driven google analytics page for each date analysis with specific recommendations based on the dataset.',
-  //   );
+    const rawData = await this.fetchGetOverallOrganic(
+      analytics,
+      propertyId,
+      dto.end_date,
+      dto.end_date,
+    );
 
-  //   return {
-  //     pagination: pagination(totalData, query.page, query.limit),
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
+    // Case when data not found
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return {};
 
-  // private async fetchGetOverallOrganicTraffic(
-  //   analytics: analyticsdata_v1beta.Analyticsdata,
-  //   propertyId: string,
-  //   startDate: string,
-  //   endDate: string,
-  // ) {
-  //   try {
-  //     const { data: overallData } = await analytics.properties.runReport({
-  //       property: `properties/${propertyId}`,
-  //       requestBody: {
-  //         dimensions: [{ name: 'sessionMedium' }],
-  //         dateRanges: [{ startDate, endDate }],
-  //         metrics: [
-  //           { name: 'sessions' },
-  //           { name: 'screenPageViews' },
-  //           { name: 'bounceRate' },
-  //           { name: 'averageSessionDuration' },
-  //           { name: 'activeUsers' },
-  //         ],
-  //         dimensionFilter: {
-  //           andGroup: {
-  //             expressions: [
-  //               {
-  //                 filter: {
-  //                   fieldName: 'sessionMedium',
-  //                   stringFilter: {
-  //                     matchType: 'EXACT',
-  //                     value: 'organic',
-  //                   },
-  //                 },
-  //               },
-  //             ],
-  //           },
-  //         },
-  //       },
-  //     });
-  //     return overallData;
-  //   } catch (error) {
-  //     Logger.error(error.message, 'GoogleAnalyticsService');
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+    const formattedData = this.formatGetOverallOrganic(rawData);
+    return formattedData;
+  }
 
-  // private formatGetOverallOrganicTraffic(
-  //   data: analyticsdata_v1beta.Schema$RunReportResponse,
-  // ) {
-  //   const metricValues = data.rows[0].metricValues;
+  private async fetchGetDailyOrganic(
+    analytics: analyticsdata_v1beta.Analyticsdata,
+    propertyId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    try {
+      const { data } = await analytics.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dimensions: [{ name: 'date' }, { name: 'sessionMedium' }],
+          dateRanges: [{ startDate, endDate }],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+            { name: 'averageSessionDuration' },
+            { name: 'activeUsers' },
+          ],
+          orderBys: [
+            {
+              dimension: { dimensionName: 'date' },
+              desc: false,
+            },
+          ],
+          dimensionFilter: {
+            andGroup: {
+              expressions: [
+                {
+                  filter: {
+                    fieldName: 'sessionMedium',
+                    stringFilter: {
+                      matchType: 'EXACT',
+                      value: 'organic',
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          // limit: limit.toString(),
+          // offset: offset.toString(),
+        },
+      });
 
-  //   return {
-  //     sessions: Number(metricValues[0].value),
-  //     screen_page_views: Number(metricValues[1].value),
-  //     bounce_rate: roundNumber<string>(metricValues[2].value),
-  //     average_session_duration: roundNumber<string>(metricValues[3].value),
-  //     active_users: Number(metricValues[4].value),
-  //   };
-  // }
+      return data;
+    } catch (error) {
+      Logger.error(error.message, 'GoogleAnalyticsService');
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  // // Organic traffic refers to the visitors who arrive at a website through unpaid search results
-  // async getOverallOrganicTraffic(
-  //   query: GetOverallOrganicTrafficQueryDto,
-  //   clientId: string,
-  // ) {
-  //   query = GoogleAnalyticsValidation.getOverallOrganicTrafficQuery.parse(
-  //     query,
-  //   ) as GetOverallOrganicTrafficQueryDto;
+  private formatGetDailyOrganic(
+    rawData: analyticsdata_v1beta.Schema$RunReportResponse,
+  ) {
+    const { rows } = rawData;
 
-  //   const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+    const formattedData = rows.map((row) => {
+      const rawDate = row.dimensionValues[0].value;
+      const formattedDate = formatDate(rawDate);
+      const bounceRate = Number(row.metricValues[2].value);
+      const bounceRatePercent = roundNumber<number>(bounceRate * 100);
+      return {
+        date: formattedDate,
+        sessions: Number(row.metricValues[0].value),
+        screen_page_views: Number(row.metricValues[1].value),
+        bounce_rate_percent: bounceRatePercent,
+        average_session_duration_seconds: roundNumber<string>(
+          row.metricValues[3].value,
+        ),
+        active_users: Number(row.metricValues[4].value),
+      };
+    });
 
-  //   const overallData = await this.fetchGetOverallOrganicTraffic(
-  //     analytics,
-  //     propertyId,
-  //     query.end_date,
-  //     query.end_date,
-  //   );
+    return formattedData;
+  }
 
-  //   // Case when data not found
-  //   const hasData = overallData?.rowCount > 0;
-  //   if (!hasData) {
-  //     return {
-  //       analysis: 'No data found',
-  //       data: {},
-  //     };
-  //   }
+  async getDailyOrganic(query: GetDailyOrganicDto, clientId: string) {
+    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
 
-  //   const overallFormattedData =
-  //     this.formatGetOverallOrganicTraffic(overallData);
+    const rawData = await this.fetchGetDailyOrganic(
+      analytics,
+      propertyId,
+      query.start_date,
+      query.end_date,
+    );
 
-  //   const analysis = await openaiAnalysis(
-  //     overallFormattedData,
-  //     'Provides data-driven google analytics overall organic traffic data analysis with specific recommendations based on the dataset.',
-  //   );
+    // Case when data not found
+    const hasData = rawData?.rowCount > 0;
+    if (!hasData) return [] as string[];
 
-  //   return {
-  //     analysis,
-  //     data: overallFormattedData,
-  //   };
-  // }
+    const formattedData = this.formatGetDailyOrganic(rawData);
+    return formattedData;
+  }
 
-  // private async fetchGetDailyOrganicTraffic(
-  //   analytics: analyticsdata_v1beta.Analyticsdata,
-  //   propertyId: string,
-  //   startDate: string,
-  //   endDate: string,
-  //   orderBy: boolean,
-  //   limit: number,
-  //   offset: number,
-  // ) {
-  //   try {
-  //     const [paginationRawData, allRawData] = await Promise.all([
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'date' }, { name: 'sessionMedium' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               dimension: { dimensionName: 'date' },
-  //               desc: orderBy,
-  //             },
-  //           ],
-  //           dimensionFilter: {
-  //             andGroup: {
-  //               expressions: [
-  //                 {
-  //                   filter: {
-  //                     fieldName: 'sessionMedium',
-  //                     stringFilter: {
-  //                       matchType: 'EXACT',
-  //                       value: 'organic',
-  //                     },
-  //                   },
-  //                 },
-  //               ],
-  //             },
-  //           },
-  //           limit: limit.toString(),
-  //           offset: offset.toString(),
-  //         },
-  //       }),
+  async getAllPropertyIds(clientId: string) {
+    const oauth2Client = await this.getOauth2Client(clientId);
 
-  //       analytics.properties.runReport({
-  //         property: `properties/${propertyId}`,
-  //         requestBody: {
-  //           dimensions: [{ name: 'date' }],
-  //           dateRanges: [{ startDate, endDate }],
-  //           metrics: [
-  //             { name: 'sessions' },
-  //             { name: 'screenPageViews' },
-  //             { name: 'bounceRate' },
-  //             { name: 'averageSessionDuration' },
-  //             { name: 'activeUsers' },
-  //           ],
-  //           orderBys: [
-  //             {
-  //               dimension: { dimensionName: 'date' },
-  //               desc: true,
-  //             },
-  //           ],
-  //         },
-  //       }),
-  //     ]);
+    const analytics = google.analyticsadmin({
+      version: 'v1beta',
+      auth: oauth2Client,
+    });
 
-  //     const { data: paginationData } = paginationRawData;
-  //     const { data: allData } = allRawData;
+    const rawAccount = await analytics.accounts.list();
+    const account = rawAccount.data?.accounts?.[0];
+    if (!account) return [] as string[];
 
-  //     return {
-  //       paginationData,
-  //       allData,
-  //     };
-  //   } catch (error) {
-  //     Logger.error(error.message, 'GoogleAnalyticsService');
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+    const propertiesResponse = await analytics.properties.list({
+      filter: `parent:${account.name}`,
+    });
 
-  // private formatGetDailyOrganicTraffic(
-  //   paginationData: analyticsdata_v1beta.Schema$RunReportResponse,
-  //   allData: analyticsdata_v1beta.Schema$RunReportResponse,
-  // ) {
-  //   const { rows: paginationRowsData } = paginationData;
-  //   const { rows: allRowsData } = allData;
+    const properties = propertiesResponse.data?.properties;
+    if (!properties) return [] as string[];
 
-  //   const paginationFormattedData = paginationRowsData.map((row) => {
-  //     return {
-  //       date: row.dimensionValues[0].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
+    const formattedProperties = properties.map((property) => {
+      const propertyId = property.name.split('/').pop();
+      const name = property.displayName;
 
-  //   const allFormattedData = allRowsData.map((row) => {
-  //     return {
-  //       date: row.dimensionValues[0].value,
-  //       sessions: Number(row.metricValues[0].value),
-  //       screen_page_views: Number(row.metricValues[1].value),
-  //       bounce_rate: roundNumber<string>(row.metricValues[2].value),
-  //       average_session_duration: roundNumber<string>(
-  //         row.metricValues[3].value,
-  //       ),
-  //       active_users: Number(row.metricValues[4].value),
-  //     };
-  //   });
+      return {
+        property_id: propertyId,
+        name,
+      };
+    });
 
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedData,
-  //   };
-  // }
+    return formattedProperties;
+  }
 
-  // async getDailyOrganicTraffic(
-  //   query: GetDailyOrganicTrafficQueryDto,
-  //   clientId: string,
-  // ) {
-  //   query = GoogleAnalyticsValidation.getDailyOrganicTrafficQuery.parse(
-  //     query,
-  //   ) as GetDailyOrganicTrafficQueryDto;
+  async getCurrentProperty(clientId: string) {
+    const propertyId = await this.getPropertyId(clientId);
+    const oauth2Client = await this.getOauth2Client(clientId);
 
-  //   const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+    const analyticsAdmin = google.analyticsadmin({
+      version: 'v1beta',
+      auth: oauth2Client,
+    });
 
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
+    const propertyResponse = await analyticsAdmin.properties.get({
+      name: `properties/${propertyId}`,
+    });
 
-  //   const { paginationData, allData } = await this.fetchGetDailyOrganicTraffic(
-  //     analytics,
-  //     propertyId,
-  //     query.start_date,
-  //     query.end_date,
-  //     orderBy,
-  //     query.limit,
-  //     offset,
-  //   );
+    const property = propertyResponse.data;
 
-  //   // Case when data not found
-  //   const isTotalDataAvailable = allData?.rowCount > 0;
-  //   const totalData = isTotalDataAvailable ? allData.rowCount : 0;
-  //   const isPaginationDataAvailable = paginationData?.rows?.length > 0;
-  //   if (!isPaginationDataAvailable) {
-  //     return {
-  //       pagination: pagination(totalData, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
-
-  //   const { paginationFormattedData, allFormattedData } =
-  //     this.formatGetDailyOrganicTraffic(paginationData, allData);
-
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedData,
-  //     'Provides data-driven google analytics daily organic traffic data analysis with specific recommendations based on the dataset.',
-  //   );
-
-  //   return {
-  //     pagination: pagination(totalData, query.page, query.limit),
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
-
-  // async getAllPropertyIds(clientId: string) {
-  //   const oauth2Client = await this.getOauth2Client(clientId);
-
-  //   const analytics = google.analyticsadmin({
-  //     version: 'v1beta',
-  //     auth: oauth2Client,
-  //   });
-
-  //   const rawAccount = await analytics.accounts.list();
-  //   const account = rawAccount.data?.accounts?.[0];
-  //   if (!account) return [] as string[];
-
-  //   const propertiesResponse = await analytics.properties.list({
-  //     filter: `parent:${account.name}`,
-  //   });
-
-  //   const properties = propertiesResponse.data?.properties;
-  //   if (!properties) return [] as string[];
-
-  //   const formattedProperties = properties.map((property) => {
-  //     const propertyId = property.name.split('/').pop();
-  //     const name = property.displayName;
-
-  //     return {
-  //       property_id: propertyId,
-  //       name,
-  //     };
-  //   });
-
-  //   return formattedProperties;
-  // }
-
-  // async getCurrentProperty(clientId: string) {
-  //   const propertyId = await this.getPropertyId(clientId);
-  //   const oauth2Client = await this.getOauth2Client(clientId);
-
-  //   const analyticsAdmin = google.analyticsadmin({
-  //     version: 'v1beta',
-  //     auth: oauth2Client,
-  //   });
-
-  //   const propertyResponse = await analyticsAdmin.properties.get({
-  //     name: `properties/${propertyId}`,
-  //   });
-
-  //   const property = propertyResponse.data;
-
-  //   return {
-  //     property_id: propertyId,
-  //     name: property.displayName,
-  //   };
-  // }
+    return {
+      property_id: propertyId,
+      name: property.displayName,
+    };
+  }
 }

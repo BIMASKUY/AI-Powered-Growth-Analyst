@@ -630,8 +630,8 @@ export class GoogleSearchConsoleService {
 
     // format data first
     const formattedData = rows.map((item) => ({
-      id: item.keys[0],
-      name: this.getFullCountryName(item.keys[0]),
+      // id: item.keys[0], // for debug only
+      country: this.getFullCountryName(item.keys[0]),
       clicks: item.clicks,
       impressions: item.impressions,
       ctr_percent: roundNumber<number>(item.ctr * 100),
@@ -640,9 +640,7 @@ export class GoogleSearchConsoleService {
 
     // then filter by search
     const filteredData = search
-      ? formattedData.filter((item) =>
-          item.name.toLowerCase().includes(search.toLowerCase()),
-        )
+      ? formattedData.filter(({ country }) => country.includes(search))
       : formattedData;
 
     // then limit
