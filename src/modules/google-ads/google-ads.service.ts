@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, HttpException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -322,37 +323,41 @@ export class GoogleAdsService {
     campaigns: services.IGoogleAdsRow[],
     currencyCode: string,
   ) {
-    const formattedCampaigns = campaigns.map((campaign) => {
-      const id = campaign.campaign.resource_name.split('/')[3];
-      const status = enums.CampaignStatus[campaign.campaign.status];
-      const spend = campaign.metrics.cost_micros / 1000000;
-      const conversionValue = campaign.metrics.conversions_value;
-      const conversions = campaign.metrics.conversions;
-      const clicks = campaign.metrics.clicks;
+    const formattedCampaigns = campaigns
+      .map((campaign) => {
+        const id = campaign.campaign.resource_name.split('/')[3];
+        const status = enums.CampaignStatus[campaign.campaign.status];
+        const spend = campaign.metrics.cost_micros / 1000000;
+        const conversionValue = campaign.metrics.conversions_value;
+        const conversions = campaign.metrics.conversions;
+        const clicks = campaign.metrics.clicks;
 
-      const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
-      const roiPercent = roundNumber<number>(roi * 100);
-      const conversionRates = clicks > 0 ? conversions / clicks : 0;
-      const conversionRatePercent = roundNumber<number>(conversionRates * 100);
+        const roi = spend > 0 ? (conversionValue - spend) / spend : 0;
+        const roiPercent = roundNumber<number>(roi * 100);
+        const conversionRates = clicks > 0 ? conversions / clicks : 0;
+        const conversionRatePercent = roundNumber<number>(
+          conversionRates * 100,
+        );
 
-      const roundedSpend = roundNumber<number>(spend);
-      const ctrPercent = campaign.metrics.ctr
-        ? roundNumber<number>(campaign.metrics.ctr * 100)
-        : campaign.metrics.ctr;
+        const roundedSpend = roundNumber<number>(spend);
+        const ctrPercent = campaign.metrics.ctr
+          ? roundNumber<number>(campaign.metrics.ctr * 100)
+          : campaign.metrics.ctr;
 
-      const spendFieldName = `spend_${currencyCode}`;
+        const spendFieldName = `spend_${currencyCode}`;
 
-      return {
-        id,
-        name: campaign.campaign.name,
-        status,
-        impressions: campaign.metrics.impressions,
-        [spendFieldName]: roundedSpend,
-        conversion_rate_percent: conversionRatePercent,
-        ctr_percent: ctrPercent,
-        roi_percent: roiPercent,
-      };
-    });
+        return {
+          id,
+          name: campaign.campaign.name,
+          status,
+          impressions: campaign.metrics.impressions,
+          [spendFieldName]: roundedSpend,
+          conversion_rate_percent: conversionRatePercent,
+          ctr_percent: ctrPercent,
+          roi_percent: roiPercent,
+        };
+      })
+      .sort((a, b) => b.roi_percent - a.roi_percent);
 
     return formattedCampaigns;
   }

@@ -432,13 +432,15 @@ export class GoogleSearchConsoleService {
   ) {
     const { rows } = rawData;
 
-    const allFormattedData = rows.map((item) => ({
-      keyword: item.keys[0],
-      clicks: item.clicks,
-      impressions: item.impressions,
-      ctr_percent: roundNumber<number>(item.ctr * 100),
-      average_position: roundNumber<number>(item.position),
-    }));
+    const allFormattedData = rows
+      .map((item) => ({
+        keyword: item.keys[0],
+        clicks: item.clicks,
+        impressions: item.impressions,
+        ctr_percent: roundNumber<number>(item.ctr * 100),
+        average_position: roundNumber<number>(item.position),
+      }))
+      .sort((a, b) => b.ctr_percent - a.ctr_percent);
 
     return allFormattedData;
   }
@@ -640,8 +642,13 @@ export class GoogleSearchConsoleService {
       ? formattedData.filter(({ country }) => country.includes(search))
       : formattedData;
 
+    // then sort by impressions desc
+    const sortedData = filteredData.sort(
+      (a, b) => b.ctr_percent - a.ctr_percent,
+    );
+
     // then limit
-    const limitedData = filteredData.slice(0, limit);
+    const limitedData = sortedData.slice(0, limit);
 
     return limitedData;
   }
