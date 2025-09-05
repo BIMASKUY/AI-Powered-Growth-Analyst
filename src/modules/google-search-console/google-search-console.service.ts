@@ -1,9 +1,16 @@
+/* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, Logger, HttpException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  HttpException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { google, searchconsole_v1 } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
 import { roundNumber } from 'src/utils/global.utils';
@@ -12,6 +19,10 @@ import ISO from 'iso-3166-1';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetKeywordsDto } from './dto/get-keywords.dto';
+import { GetByKeywordDto } from './dto/get-by-keyword.dto';
+import { compareAsc } from 'date-fns';
+import { GetCountriesDto } from './dto/get-countries.dto';
+import { GetByCountryDto } from './dto/get-by-country.dto';
 // import { RedisService } from '../common/service/redis.service';
 
 @Injectable()
@@ -20,6 +31,7 @@ export class GoogleSearchConsoleService {
   private readonly SERVICE_NAME = 'google-search-console';
   private readonly STATIC_OAUTH2_CLIENT_FOR_TESTING: any;
   private readonly STATIC_GOOGLE_SEARCH_CONSOLE_FOR_TESTING: any;
+  private readonly logger = new Logger(GoogleSearchConsoleService.name);
 
   constructor(
     private readonly configService: ConfigService,
@@ -154,19 +166,46 @@ export class GoogleSearchConsoleService {
   }
 
   private getFullCountryName(countryCode: string): string {
-    try {
-      let country = ISO.whereAlpha2(countryCode.toUpperCase()); // 2 letter codes
+    const code = countryCode.toUpperCase();
 
-      // If that fails, try 3-letter codes
-      if (!country && countryCode.length === 3) {
-        country = ISO.whereAlpha3(countryCode.toUpperCase());
-      }
+    // Special case
+    const specialCodes: Record<string, string> = {
+      ZZZ: 'Unknown Country',
+      XKK: 'Kosovo',
+    };
 
-      return country?.country || countryCode;
-    } catch (error) {
-      console.warn(`Unable to get country name for code: ${countryCode}`);
-      return countryCode;
+    if (specialCodes[code]) {
+      return specialCodes[code];
     }
+
+    const { country } = ISO.whereAlpha3(code); // 3 letter codes
+    return country;
+  }
+
+  private getCountryCode(countryName: string): string | null {
+    const allCountries = ISO.all();
+
+    // try exact match first (case-insensitive)
+    const exactMatch = allCountries.find(
+      (c) => c.country.toLowerCase() === countryName.toLowerCase(),
+    );
+
+    if (exactMatch) return exactMatch.alpha3; // return 3 letter code
+
+    // if not found, try partial match
+    const partialMatches = allCountries.filter(
+      (c) =>
+        c.country.toLowerCase().includes(countryName.toLowerCase()) ||
+        countryName.toLowerCase().includes(c.country.toLowerCase()),
+    );
+
+    // if exactly 1 match, return it
+    if (partialMatches.length === 1) return partialMatches[0].alpha3;
+
+    this.logger.error(`count ${partialMatches.length} for ${countryName}`);
+
+    // if matches > 1 or matches == 0, return null
+    return null;
   }
 
   private async fetchGetOverall(
@@ -195,9 +234,9 @@ export class GoogleSearchConsoleService {
   }
 
   private formatGetOverall(
-    data: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
+    rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
   ) {
-    const metricValues = data.rows[0];
+    const metricValues = rawData.rows[0];
     return {
       clicks: metricValues.clicks,
       impressions: metricValues.impressions,
@@ -222,7 +261,7 @@ export class GoogleSearchConsoleService {
     const { searchConsole, siteUrl } =
       await this.getGoogleSearchConsole(clientId);
 
-    const overallData = await this.fetchGetOverall(
+    const rawData = await this.fetchGetOverall(
       searchConsole,
       siteUrl,
       dto.start_date,
@@ -230,10 +269,10 @@ export class GoogleSearchConsoleService {
     );
 
     // Case when data not found
-    const hasData = overallData.rows?.[0];
+    const hasData = rawData.rows?.[0];
     if (!hasData) return {};
 
-    const overallFormattedData = this.formatGetOverall(overallData);
+    const formattedData = this.formatGetOverall(rawData);
 
     // Save cache to redis
     // await this.redisService.add(
@@ -250,7 +289,7 @@ export class GoogleSearchConsoleService {
     //   },
     // );
 
-    return overallFormattedData;
+    return formattedData;
   }
 
   private async fetchGetDaily(
@@ -281,9 +320,9 @@ export class GoogleSearchConsoleService {
   }
 
   private formatGetDaily(
-    allData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
+    rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
   ) {
-    const allFormattedData = allData.rows.map((item) => ({
+    const allFormattedData = rawData.rows.map((item) => ({
       date: item.keys[0],
       clicks: item.clicks,
       impressions: item.impressions,
@@ -312,14 +351,17 @@ export class GoogleSearchConsoleService {
     const { searchConsole, siteUrl } =
       await this.getGoogleSearchConsole(clientId);
 
-    const allData = await this.fetchGetDaily(
+    const rawData = await this.fetchGetDaily(
       searchConsole,
       siteUrl,
       dto.start_date,
       dto.end_date,
     );
 
-    const formattedData = this.formatGetDaily(allData);
+    const hasData = rawData?.rows?.length > 0;
+    if (!hasData) return [] as string[];
+
+    const formattedData = this.formatGetDaily(rawData);
 
     // Save cache to redis
     // await this.redisService.add(
@@ -371,12 +413,6 @@ export class GoogleSearchConsoleService {
             },
           ],
           rowLimit: limit,
-          // orderBy: [
-          //   {
-          //     field: 'clicks',
-          //     sortOrder: 'ASCENDING',
-          //   },
-          // ],
         },
       });
 
@@ -392,12 +428,11 @@ export class GoogleSearchConsoleService {
   }
 
   private formatGetKeywords(
-    allData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
+    rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
   ) {
-    const { rows: allRowsData } = allData;
-    console.log(allRowsData);
+    const { rows } = rawData;
 
-    const allFormattedData = allRowsData.map((item) => ({
+    const allFormattedData = rows.map((item) => ({
       keyword: item.keys[0],
       clicks: item.clicks,
       impressions: item.impressions,
@@ -426,7 +461,7 @@ export class GoogleSearchConsoleService {
     const { searchConsole, siteUrl } =
       await this.getGoogleSearchConsole(clientId);
 
-    const allData = await this.fetchGetKeywords(
+    const rawData = await this.fetchGetKeywords(
       searchConsole,
       siteUrl,
       dto.start_date,
@@ -435,7 +470,10 @@ export class GoogleSearchConsoleService {
       dto.search,
     );
 
-    const formattedData = this.formatGetKeywords(allData);
+    const hasData = rawData?.rows?.length > 0;
+    if (!hasData) return [] as string[];
+
+    const formattedData = this.formatGetKeywords(rawData);
 
     // Save cache to redis (only for query without search)
     // if (!query.search) {
@@ -462,571 +500,331 @@ export class GoogleSearchConsoleService {
     return formattedData;
   }
 
-  // private async fetchGetByKeyword(
-  //   searchConsole: searchconsole_v1.Searchconsole,
-  //   siteUrl: string,
-  //   startDate: string,
-  //   endDate: string,
-  //   limit: number,
-  //   offset: number,
-  //   keyword: string,
-  // ) {
-  //   try {
-  //     const [paginationRawData, allRawData] = await Promise.all([
-  //       searchConsole.searchanalytics.query({
-  //         siteUrl,
-  //         requestBody: {
-  //           startDate,
-  //           endDate,
-  //           dimensions: ['query', 'date'],
-  //           rowLimit: limit,
-  //           startRow: offset,
-  //           dimensionFilterGroups: [
-  //             {
-  //               filters: [
-  //                 {
-  //                   dimension: 'query',
-  //                   expression: keyword,
-  //                 },
-  //               ],
-  //             },
-  //           ],
-  //         },
-  //       }),
+  private async fetchGetByKeyword(
+    searchConsole: searchconsole_v1.Searchconsole,
+    siteUrl: string,
+    startDate: string,
+    endDate: string,
+    limit: number,
+    keyword: string,
+  ) {
+    try {
+      const { data } = await searchConsole.searchanalytics.query({
+        siteUrl,
+        requestBody: {
+          startDate,
+          endDate,
+          dimensions: ['query', 'date'],
+          rowLimit: limit,
+          dimensionFilterGroups: [
+            {
+              filters: [
+                {
+                  dimension: 'query',
+                  expression: keyword,
+                },
+              ],
+            },
+          ],
+          aggregationType: 'byPage',
+        },
+      });
 
-  //       searchConsole.searchanalytics.query({
-  //         siteUrl,
-  //         requestBody: {
-  //           startDate,
-  //           endDate,
-  //           dimensions: ['query', 'date'],
-  //           dimensionFilterGroups: [
-  //             {
-  //               filters: [
-  //                 {
-  //                   dimension: 'query',
-  //                   expression: keyword,
-  //                 },
-  //               ],
-  //             },
-  //           ],
-  //         },
-  //       }),
-  //     ]);
+      return data;
+    } catch (error) {
+      Logger.error(
+        `access denied error`,
+        error.message,
+        'GoogleSearchConsoleService',
+      );
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  //     const { data: paginationData } = paginationRawData;
-  //     const { data: allData } = allRawData;
+  private formatGetByKeyword(
+    rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
+  ) {
+    const { rows } = rawData;
 
-  //     return {
-  //       paginationData,
-  //       allData,
-  //     };
-  //   } catch (error) {
-  //     Logger.error(
-  //       `access denied error`,
-  //       error.message,
-  //       'GoogleSearchConsoleService',
-  //     );
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+    const formattedData = rows
+      .map((item) => ({
+        date: item.keys[1],
+        clicks: item.clicks,
+        impressions: item.impressions,
+        ctr_percent: roundNumber<number>(item.ctr * 100),
+        average_position: roundNumber<number>(item.position),
+      }))
+      .sort((a, b) => compareAsc(new Date(a.date), new Date(b.date)));
 
-  // private formatGetByKeyword(
-  //   paginationData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  //   allData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  //   orderBy: boolean,
-  // ) {
-  //   const { rows: paginationRowsData } = paginationData;
-  //   const { rows: allRowsData } = allData;
+    return formattedData;
+  }
 
-  //   const paginationFormattedData = paginationRowsData
-  //     .map((item) => ({
-  //       date: item.keys[1],
-  //       clicks: item.clicks,
-  //       impressions: item.impressions,
-  //       ctr: roundNumber<number>(item.ctr),
-  //       position: roundNumber<number>(item.position),
-  //     }))
-  //     .sort((a, b) => {
-  //       if (orderBy)
-  //         return new Date(b.date).getTime() - new Date(a.date).getTime();
-  //       else return new Date(a.date).getTime() - new Date(b.date).getTime();
-  //     });
+  async getByKeyword(dto: GetByKeywordDto, keyword: string, clientId: string) {
+    const { searchConsole, siteUrl } =
+      await this.getGoogleSearchConsole(clientId);
 
-  //   const allFormattedData = allRowsData
-  //     .map((item) => ({
-  //       date: item.keys[1],
-  //       clicks: item.clicks,
-  //       impressions: item.impressions,
-  //       ctr: item.ctr,
-  //       position: item.position,
-  //     }))
-  //     .sort((a, b) => {
-  //       if (orderBy)
-  //         return new Date(b.date).getTime() - new Date(a.date).getTime();
-  //       else return new Date(a.date).getTime() - new Date(b.date).getTime();
-  //     });
+    const rawData = await this.fetchGetByKeyword(
+      searchConsole,
+      siteUrl,
+      dto.start_date,
+      dto.end_date,
+      dto.limit,
+      keyword,
+    );
 
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedData,
-  //   };
-  // }
+    const hasData = rawData?.rows?.length > 0;
+    if (!hasData) return [] as string[];
 
-  // async getByKeyword(
-  //   query: GetByKeywordQueryDto,
-  //   clientId: string,
-  //   keyword: string,
-  // ) {
-  //   query = GoogleSearchConsoleValidation.getByKeywordQuery.parse(
-  //     query,
-  //   ) as GetByKeywordQueryDto;
+    const formattedData = this.formatGetByKeyword(rawData);
 
-  //   keyword = GoogleSearchConsoleValidation.getByKeywordParam.parse(keyword);
+    return formattedData;
+  }
 
-  //   const { searchConsole, siteUrl } =
-  //     await this.getGoogleSearchConsole(clientId);
+  private async fetchGetCountries(
+    searchConsole: searchconsole_v1.Searchconsole,
+    siteUrl: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    try {
+      const { data } = await searchConsole.searchanalytics.query({
+        siteUrl,
+        requestBody: {
+          startDate,
+          endDate,
+          dimensions: ['country'],
+          // removed because filters search by country full name not abbreviation name
+          // dimensionFilterGroups: [
+          //   {
+          //     filters: [
+          //       {
+          //         dimension: 'country',
+          //         operator: 'contains',
+          //         expression: query.search,
+          //       },
+          //     ],
+          //   },
+          // ],
+          // removed because filters need pagination manually
+          // rowLimit: limit,
+          // startRow: offset,
+        },
+      });
+      return data;
+    } catch (error) {
+      Logger.error(
+        'access denied error',
+        error.message,
+        'GoogleSearchConsoleService',
+      );
+      throw new ForbiddenException(error.message);
+    }
+  }
 
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
+  private formatGetCountries(
+    rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
+    limit: number,
+    search: string,
+  ) {
+    const { rows } = rawData;
 
-  //   const { paginationData, allData } = await this.fetchGetByKeyword(
-  //     searchConsole,
-  //     siteUrl,
-  //     query.start_date,
-  //     query.end_date,
-  //     query.limit,
-  //     offset,
-  //     keyword,
-  //   );
+    // format data first
+    const formattedData = rows.map((item) => ({
+      id: item.keys[0],
+      name: this.getFullCountryName(item.keys[0]),
+      clicks: item.clicks,
+      impressions: item.impressions,
+      ctr_percent: roundNumber<number>(item.ctr * 100),
+      average_position: roundNumber<number>(item.position),
+    }));
 
-  //   // Case when data not found
-  //   const isTotalDataAvailable = allData?.rows?.length > 0;
-  //   const totalData = isTotalDataAvailable ? allData.rows.length : 0;
-  //   const isPaginationDataAvailable = paginationData?.rows?.length > 0;
-  //   if (!isPaginationDataAvailable) {
-  //     return {
-  //       pagination: pagination(totalData, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
+    // then filter by search
+    const filteredData = search
+      ? formattedData.filter((item) =>
+          item.name.toLowerCase().includes(search.toLowerCase()),
+        )
+      : formattedData;
 
-  //   const { paginationFormattedData, allFormattedData } =
-  //     this.formatGetByKeyword(paginationData, allData, orderBy);
+    // then limit
+    const limitedData = filteredData.slice(0, limit);
 
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedData,
-  //     'Provides data-driven daily google search console keywords analysis with specific recommendations based on the dataset.',
-  //   );
+    return limitedData;
+  }
 
-  //   return {
-  //     pagination: pagination(totalData, query.page, query.limit),
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
+  async getCountries(dto: GetCountriesDto, clientId: string) {
+    // Check cache first (the cache is only for query without search)
+    // const cachedData = await this.redisService.get(
+    //   clientId,
+    //   this.SERVICE_NAME,
+    //   'get-countries',
+    //   query.start_date,
+    //   query.end_date,
+    //   true,
+    //   query.order_by,
+    //   query.limit,
+    //   query.page,
+    // );
+    // if (cachedData) return cachedData as GetCountries;
 
-  // private async fetchGetCountries(
-  //   searchConsole: searchconsole_v1.Searchconsole,
-  //   siteUrl: string,
-  //   startDate: string,
-  //   endDate: string,
-  // ) {
-  //   try {
-  //     const { data: allData } = await searchConsole.searchanalytics.query({
-  //       siteUrl,
-  //       requestBody: {
-  //         startDate,
-  //         endDate,
-  //         dimensions: ['country'],
-  //         // removed because filters search by country full name not abbreviation name
-  //         // dimensionFilterGroups: [
-  //         //   {
-  //         //     filters: [
-  //         //       {
-  //         //         dimension: 'country',
-  //         //         operator: 'contains',
-  //         //         expression: query.search,
-  //         //       },
-  //         //     ],
-  //         //   },
-  //         // ],
-  //         // removed because filters need pagination manually
-  //         // rowLimit: limit,
-  //         // startRow: offset,
-  //       },
-  //     });
-  //     return allData;
-  //   } catch (error) {
-  //     Logger.error(
-  //       'access denied error',
-  //       error.message,
-  //       'GoogleSearchConsoleService',
-  //     );
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+    const { searchConsole, siteUrl } =
+      await this.getGoogleSearchConsole(clientId);
 
-  // private formatGetCountries(
-  //   allData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  //   orderBy: boolean,
-  // ) {
-  //   const { rows: allRowsData } = allData;
+    const rawData = await this.fetchGetCountries(
+      searchConsole,
+      siteUrl,
+      dto.start_date,
+      dto.end_date,
+    );
 
-  //   const allFormattedData = allRowsData
-  //     .map((item) => ({
-  //       id: item.keys[0],
-  //       name: this.getFullCountryName(item.keys[0]),
-  //       clicks: item.clicks,
-  //       impressions: item.impressions,
-  //       ctr: roundNumber<number>(item.ctr),
-  //       position: roundNumber<number>(item.position),
-  //     }))
-  //     .sort((a, b) => {
-  //       if (orderBy) return b.clicks - a.clicks;
-  //       else return a.clicks - b.clicks;
-  //     });
+    // Case when data not found
+    const hasData = rawData?.rows?.length > 0;
+    if (!hasData) return [] as string[];
 
-  //   return allFormattedData;
-  // }
+    const formattedData = this.formatGetCountries(
+      rawData,
+      dto.limit,
+      dto.search,
+    );
 
-  // private filterGetCountries(
-  //   allFormattedData: {
-  //     id: string;
-  //     name: string;
-  //     clicks: number;
-  //     impressions: number;
-  //     ctr: number;
-  //     position: number;
-  //   }[],
-  //   limit: number,
-  //   offset: number,
-  //   search: string,
-  // ) {
-  //   const allFormattedDataWithFilter = search
-  //     ? allFormattedData.filter((item) =>
-  //         item.name.toLowerCase().includes(search.toLowerCase()),
-  //       )
-  //     : allFormattedData;
+    // Save cache to redis (only for query without search)
+    // if (!query.search) {
+    //   await this.redisService.add(
+    //     {
+    //       clientId,
+    //       service: this.SERVICE_NAME,
+    //       method: 'get-countries',
+    //       startDate: query.start_date,
+    //       endDate: query.end_date,
+    //       withAnalysis: true,
+    //       orderBy: query.order_by,
+    //       limit: query.limit,
+    //       page: query.page,
+    //     },
+    //     {
+    //       pagination: paginationInfo,
+    //       analysis,
+    //       data: paginationFormattedData,
+    //     },
+    //   );
+    // }
 
-  //   const paginationFormattedData = allFormattedDataWithFilter.slice(
-  //     offset,
-  //     offset + limit,
-  //   );
+    return formattedData;
+  }
 
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedDataWithFilter,
-  //   };
-  // }
+  private async fetchGetByCountry(
+    searchConsole: searchconsole_v1.Searchconsole,
+    siteUrl: string,
+    startDate: string,
+    endDate: string,
+    countryCode: string,
+  ) {
+    try {
+      const { data } = await searchConsole.searchanalytics.query({
+        siteUrl,
+        requestBody: {
+          startDate,
+          endDate,
+          dimensions: ['country', 'date'],
+          dimensionFilterGroups: [
+            {
+              filters: [
+                {
+                  dimension: 'country',
+                  expression: countryCode,
+                },
+              ],
+            },
+          ],
+        },
+      });
 
-  // async getCountries(
-  //   query: GetCountriesQueryDto,
-  //   clientId: string,
-  // ): Promise<GetCountries | PaginationServiceAiDataNotFound> {
-  //   query = GoogleSearchConsoleValidation.getCountriesQuery.parse(
-  //     query,
-  //   ) as GetCountriesQueryDto;
+      return data;
+    } catch (error) {
+      Logger.error(
+        'access denied error',
+        error.message,
+        'GoogleSearchConsoleService',
+      );
+      throw new HttpException(error.message, 403);
+    }
+  }
 
-  //   // Check cache first (the cache is only for query without search)
-  //   const cachedData = await this.redisService.get(
-  //     clientId,
-  //     this.SERVICE_NAME,
-  //     'get-countries',
-  //     query.start_date,
-  //     query.end_date,
-  //     true,
-  //     query.order_by,
-  //     query.limit,
-  //     query.page,
-  //   );
-  //   if (cachedData) return cachedData as GetCountries;
+  private formatGetByCountry(
+    rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
+  ) {
+    const { rows } = rawData;
 
-  //   const { searchConsole, siteUrl } =
-  //     await this.getGoogleSearchConsole(clientId);
+    const formattedData = rows
+      .map((item) => ({
+        date: item.keys[1],
+        clicks: item.clicks,
+        impressions: item.impressions,
+        ctr_percent: roundNumber<number>(item.ctr * 100),
+        average_position: roundNumber<number>(item.position),
+      }))
+      .sort((a, b) => compareAsc(new Date(a.date), new Date(b.date)));
 
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
+    return formattedData;
+  }
 
-  //   const allData = await this.fetchGetCountries(
-  //     searchConsole,
-  //     siteUrl,
-  //     query.start_date,
-  //     query.end_date,
-  //   );
+  async getByCountry(dto: GetByCountryDto, country: string, clientId: string) {
+    const { searchConsole, siteUrl } =
+      await this.getGoogleSearchConsole(clientId);
 
-  //   // Case when data not found
-  //   const hasData = allData?.rows?.length > 0;
-  //   if (!hasData) {
-  //     return {
-  //       pagination: pagination(0, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
+    const countryCode: string | null = this.getCountryCode(country);
+    if (!countryCode) {
+      throw new BadRequestException('invalid country! need more specific name');
+    }
 
-  //   const allFormattedData = this.formatGetCountries(allData, orderBy);
+    const rawData = await this.fetchGetByCountry(
+      searchConsole,
+      siteUrl,
+      dto.start_date,
+      dto.end_date,
+      countryCode,
+    );
 
-  //   const { paginationFormattedData, allFormattedDataWithFilter } =
-  //     this.filterGetCountries(
-  //       allFormattedData,
-  //       query.limit,
-  //       offset,
-  //       query.search,
-  //     );
+    // Case when data not found
+    const hasData = rawData?.rows?.length > 0;
+    if (!hasData) return [] as string[];
 
-  //   // Case when paginated data is []
-  //   const totalDataWithFilter = allFormattedDataWithFilter.length;
-  //   const totalPaginationFormattedData = paginationFormattedData.length;
-  //   if (totalPaginationFormattedData === 0) {
-  //     return {
-  //       pagination: pagination(totalDataWithFilter, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
+    const formattedData = this.formatGetByCountry(rawData);
 
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedDataWithFilter,
-  //     'Provides data-driven google search console by countries analysis with specific recommendations based on the dataset.',
-  //   );
+    return formattedData;
+  }
 
-  //   const paginationInfo = pagination(
-  //     totalDataWithFilter,
-  //     query.page,
-  //     query.limit,
-  //   );
+  async getAllProperty(clientId: string) {
+    const oauth2Client = await this.getOauth2Client(clientId);
 
-  //   // Save cache to redis (only for query without search)
-  //   if (!query.search) {
-  //     await this.redisService.add(
-  //       {
-  //         clientId,
-  //         service: this.SERVICE_NAME,
-  //         method: 'get-countries',
-  //         startDate: query.start_date,
-  //         endDate: query.end_date,
-  //         withAnalysis: true,
-  //         orderBy: query.order_by,
-  //         limit: query.limit,
-  //         page: query.page,
-  //       },
-  //       {
-  //         pagination: paginationInfo,
-  //         analysis,
-  //         data: paginationFormattedData,
-  //       },
-  //     );
-  //   }
+    const searchConsole = google.searchconsole({
+      version: 'v1',
+      auth: oauth2Client,
+    });
 
-  //   return {
-  //     pagination: paginationInfo,
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
+    const sitesResponse = await searchConsole.sites.list();
 
-  // private async fetchGetByCountry(
-  //   searchConsole: searchconsole_v1.Searchconsole,
-  //   siteUrl: string,
-  //   startDate: string,
-  //   endDate: string,
-  //   limit: number,
-  //   offset: number,
-  //   country: string,
-  // ) {
-  //   try {
-  //     const [paginationRawData, allRawData] = await Promise.all([
-  //       searchConsole.searchanalytics.query({
-  //         siteUrl,
-  //         requestBody: {
-  //           startDate,
-  //           endDate,
-  //           dimensions: ['country', 'date'],
-  //           rowLimit: limit,
-  //           startRow: offset,
-  //           dimensionFilterGroups: [
-  //             {
-  //               filters: [
-  //                 {
-  //                   dimension: 'country',
-  //                   expression: country,
-  //                 },
-  //               ],
-  //             },
-  //           ],
-  //         },
-  //       }),
+    if (
+      !sitesResponse.data.siteEntry ||
+      sitesResponse.data.siteEntry.length === 0
+    ) {
+      return [] as string[];
+    }
 
-  //       searchConsole.searchanalytics.query({
-  //         siteUrl,
-  //         requestBody: {
-  //           startDate,
-  //           endDate,
-  //           dimensions: ['country', 'date'],
-  //           dimensionFilterGroups: [
-  //             {
-  //               filters: [
-  //                 {
-  //                   dimension: 'country',
-  //                   expression: country,
-  //                 },
-  //               ],
-  //             },
-  //           ],
-  //         },
-  //       }),
-  //     ]);
+    const formattedProperties = sitesResponse.data.siteEntry.map((site) => {
+      const { siteUrl } = site || {};
+      const propertyType = siteUrl?.startsWith('sc-domain:')
+        ? 'domain'
+        : 'url_prefix';
 
-  //     const { data: paginationData } = paginationRawData;
-  //     const { data: allData } = allRawData;
+      const propertyName =
+        propertyType === 'domain' ? siteUrl.replace('sc-domain:', '') : siteUrl;
 
-  //     return {
-  //       paginationData,
-  //       allData,
-  //     };
-  //   } catch (error) {
-  //     Logger.error(
-  //       'access denied error',
-  //       error.message,
-  //       'GoogleSearchConsoleService',
-  //     );
-  //     throw new HttpException(error.message, 403);
-  //   }
-  // }
+      return {
+        property_type: propertyType,
+        property: propertyName,
+      };
+    });
 
-  // private formatGetByCountry(
-  //   paginationData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  //   allData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  //   orderBy: boolean,
-  // ) {
-  //   const { rows: paginationRowsData } = paginationData;
-  //   const { rows: allRowsData } = allData;
-
-  //   const paginationFormattedData = paginationRowsData
-  //     .map((item) => ({
-  //       date: item.keys[1],
-  //       clicks: item.clicks,
-  //       impressions: item.impressions,
-  //       ctr: roundNumber<number>(item.ctr),
-  //       position: roundNumber<number>(item.position),
-  //     }))
-  //     .sort((a, b) => {
-  //       if (orderBy)
-  //         return new Date(b.date).getTime() - new Date(a.date).getTime();
-  //       else return new Date(a.date).getTime() - new Date(b.date).getTime();
-  //     });
-
-  //   const allFormattedData = allRowsData
-  //     .map((item) => ({
-  //       date: item.keys[1],
-  //       clicks: item.clicks,
-  //       impressions: item.impressions,
-  //       ctr: item.ctr,
-  //       position: item.position,
-  //     }))
-  //     .sort((a, b) => {
-  //       if (orderBy)
-  //         return new Date(b.date).getTime() - new Date(a.date).getTime();
-  //       else return new Date(a.date).getTime() - new Date(b.date).getTime();
-  //     });
-
-  //   return {
-  //     paginationFormattedData,
-  //     allFormattedData,
-  //   };
-  // }
-
-  // async getByCountry(
-  //   query: GetByCountryQueryDto,
-  //   clientId: string,
-  //   country: string,
-  // ) {
-  //   query = GoogleSearchConsoleValidation.getByCountryQuery.parse(
-  //     query,
-  //   ) as GetByCountryQueryDto;
-
-  //   country = GoogleSearchConsoleValidation.getByCountryParam.parse(country);
-
-  //   const { searchConsole, siteUrl } =
-  //     await this.getGoogleSearchConsole(clientId);
-
-  //   // pagination
-  //   const offset = (query.page - 1) * query.limit;
-  //   const orderBy = query.order_by === 'desc' ? true : false;
-
-  //   const { paginationData, allData } = await this.fetchGetByCountry(
-  //     searchConsole,
-  //     siteUrl,
-  //     query.start_date,
-  //     query.end_date,
-  //     query.limit,
-  //     offset,
-  //     country,
-  //   );
-
-  //   // Case when data not found
-  //   const isTotalDataAvailable = allData?.rows?.length > 0;
-  //   const totalData = isTotalDataAvailable ? allData.rows.length : 0;
-  //   const isPaginationDataAvailable = paginationData?.rows?.length > 0;
-  //   if (!isPaginationDataAvailable) {
-  //     return {
-  //       pagination: pagination(totalData, query.page, query.limit),
-  //       analysis: 'No data found',
-  //       data: [] as string[],
-  //     };
-  //   }
-
-  //   const { paginationFormattedData, allFormattedData } =
-  //     this.formatGetByCountry(paginationData, allData, orderBy);
-
-  //   const analysis = await openaiAnalysis(
-  //     allFormattedData,
-  //     'Provides data-driven daily google search console by country analysis with specific recommendations based on the dataset.',
-  //   );
-
-  //   return {
-  //     pagination: pagination(totalData, query.page, query.limit),
-  //     analysis,
-  //     data: paginationFormattedData,
-  //   };
-  // }
-
-  // async getAllProperty(clientId: string) {
-  //   const oauth2Client = await this.getOauth2Client(clientId);
-
-  //   const searchConsole = google.searchconsole({
-  //     version: 'v1',
-  //     auth: oauth2Client,
-  //   });
-
-  //   const sitesResponse = await searchConsole.sites.list();
-
-  //   if (
-  //     !sitesResponse.data.siteEntry ||
-  //     sitesResponse.data.siteEntry.length === 0
-  //   ) {
-  //     return [] as string[];
-  //   }
-
-  //   const formattedProperties = sitesResponse.data.siteEntry.map((site) => {
-  //     const { siteUrl } = site || {};
-  //     const propertyType = siteUrl?.startsWith('sc-domain:')
-  //       ? 'domain'
-  //       : 'url_prefix';
-
-  //     const propertyName =
-  //       propertyType === 'domain' ? siteUrl.replace('sc-domain:', '') : siteUrl;
-
-  //     return {
-  //       property_type: propertyType,
-  //       property: propertyName,
-  //     };
-  //   });
-
-  //   return formattedProperties;
-  // }
+    return formattedProperties;
+  }
 }

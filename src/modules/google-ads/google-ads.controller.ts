@@ -63,15 +63,15 @@ export class GoogleAdsController {
   }
 
   @ApiOperation({ summary: 'Get google ads campaign by id' })
-  @Get('campaigns/:campaign_id')
+  @Get('campaigns/:id')
   async getCampaignById(
     // @Auth() user: AuthUser,
     @Query() dto: GetCampaignByIdDto,
-    @Param('campaign_id') campaign_id: string,
+    @Param('id') id: string,
   ) {
     const data = await this.googleAdsService.getCampaignById(
       dto,
-      campaign_id,
+      id,
       'test-client-id',
     );
     const message = 'google ads campaign by id fetched successfully';

@@ -8,6 +8,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetKeywordsDto } from './dto/get-keywords.dto';
+import { GetByKeywordDto } from './dto/get-by-keyword.dto';
+import { GetCountriesDto } from './dto/get-countries.dto';
+import { GetByCountryDto } from './dto/get-by-country.dto';
 
 // @ApiBearerAuth()
 // @UseGuards(AuthGuard)
@@ -18,7 +21,7 @@ export class GoogleSearchConsoleController {
     private readonly googleSearchConsoleService: GoogleSearchConsoleService,
   ) {}
 
-  @ApiOperation({ summary: 'Get google search console overall data' })
+  @ApiOperation({ summary: 'Get google search console overall' })
   @Get('overall')
   async getOverall(
     // @Auth() user: AuthUser,
@@ -28,14 +31,14 @@ export class GoogleSearchConsoleController {
       dto,
       'test-client-id',
     );
-    const message = 'google search console overall data fetched successfully';
+    const message = 'google search console overall fetched successfully';
     return {
       message,
       data,
     };
   }
 
-  @ApiOperation({ summary: 'Get google search console daily data' })
+  @ApiOperation({ summary: 'Get google search console daily' })
   @Get('daily')
   async getDaily(
     // @Auth() user: AuthUser,
@@ -45,7 +48,7 @@ export class GoogleSearchConsoleController {
       dto,
       'test-client-id',
     );
-    const message = 'google search console daily data fetched successfully';
+    const message = 'google search console daily fetched successfully';
     return {
       message,
       data,
@@ -69,67 +72,58 @@ export class GoogleSearchConsoleController {
     };
   }
 
-  // @ApiOperation({ summary: 'Get google search console by keyword' })
-  // @Get('search-console/keywords/:keyword')
-  // async getByKeyword(
-  //   @Auth() user: AuthUser,
-  //   @Query() query: GetByKeywordQueryDto,
-  //   @Param() param: GetKeywordParamDto,
-  // ) {
-  //   const { pagination, analysis, data } =
-  //     await this.googleSearchConsoleService.getByKeyword(
-  //       query,
-  //       user.user_metadata.client_id,
-  //       param.keyword,
-  //     );
-  //   const message = 'google search console by keyword fetched successfully';
-  //   return {
-  //     message,
-  //     pagination,
-  //     analysis,
-  //     data,
-  //   };
-  // }
+  @ApiOperation({ summary: 'Get google search console by keyword' })
+  @Get('keywords/:keyword')
+  async getByKeyword(
+    // @Auth() user: AuthUser,
+    @Query() dto: GetByKeywordDto,
+    @Param('keyword') keyword: string,
+  ) {
+    const data = await this.googleSearchConsoleService.getByKeyword(
+      dto,
+      keyword,
+      'test-client-id',
+    );
+    const message = 'google search console by keyword fetched successfully';
+    return {
+      message,
+      data,
+    };
+  }
 
-  // @ApiOperation({ summary: 'Get google search console countries' })
-  // @Get('search-console/countries')
-  // async getCountries(
-  //   @Auth() user: AuthUser,
-  //   @Query() query: GetCountriesQueryDto,
-  // ) {
-  //   const { pagination, analysis, data } =
-  //     await this.googleSearchConsoleService.getCountries(
-  //       query,
-  //       user.user_metadata.client_id,
-  //     );
-  //   const message = 'google search console by countries fetched successfully';
-  //   return {
-  //     message,
-  //     pagination,
-  //     analysis,
-  //     data,
-  //   };
-  // }
+  @ApiOperation({ summary: 'Get google search console countries' })
+  @Get('countries')
+  async getCountries(
+    // @Auth() user: AuthUser,
+    @Query() dto: GetCountriesDto,
+  ) {
+    const data = await this.googleSearchConsoleService.getCountries(
+      dto,
+      'test-client-id',
+    );
+    const message = 'google search console countries fetched successfully';
+    return {
+      message,
+      data,
+    };
+  }
 
-  // @ApiOperation({ summary: 'Get google search console by country' })
-  // @Get('search-console/countries/:country')
-  // async getByCountry(
-  //   @Auth() user: AuthUser,
-  //   @Query() query: GetByCountryQueryDto,
-  //   @Param() param: GetByCountryParamDto,
-  // ) {
-  //   const { pagination, analysis, data } =
-  //     await this.googleSearchConsoleService.getByCountry(
-  //       query,
-  //       user.user_metadata.client_id,
-  //       param.country,
-  //     );
-  //   const message = 'google search console by country fetched successfully';
-  //   return {
-  //     message,
-  //     pagination,
-  //     analysis,
-  //     data,
-  //   };
-  // }
+  @ApiOperation({ summary: 'Get google search console by country' })
+  @Get('countries/:country')
+  async getByCountry(
+    // @Auth() user: AuthUser,
+    @Query() dto: GetByCountryDto,
+    @Param('country') country: string,
+  ) {
+    const data = await this.googleSearchConsoleService.getByCountry(
+      dto,
+      country,
+      'test-client-id',
+    );
+    const message = 'google search console by country fetched successfully';
+    return {
+      message,
+      data,
+    };
+  }
 }
