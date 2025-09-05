@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleAdsService } from './google-ads.service';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 // import { AuthGuard } from '../auth/guards/auth.guard';
 // import { Auth } from '../common/decorator/auth.decorator';
 // import { AuthUser } from '../common/types/types';
@@ -63,6 +68,12 @@ export class GoogleAdsController {
   }
 
   @ApiOperation({ summary: 'Get google ads campaign by id' })
+  @ApiParam({
+    name: 'id',
+    description: 'Exact campaign id',
+    example: '12190673886',
+    type: String,
+  })
   @Get('campaigns/:id')
   async getCampaignById(
     // @Auth() user: AuthUser,

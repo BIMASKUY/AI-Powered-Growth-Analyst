@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleSearchConsoleService } from './google-search-console.service';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+} from '@nestjs/swagger';
 // import { AuthGuard } from '../auth/guards/auth.guard';
 // import { Auth } from '../common/decorator/auth.decorator';
 // import { AuthUser } from '../common/types/types';
@@ -73,6 +78,12 @@ export class GoogleSearchConsoleController {
   }
 
   @ApiOperation({ summary: 'Get google search console by keyword' })
+  @ApiParam({
+    name: 'keyword',
+    description: 'Should be exact keyword',
+    example: 'bmw x8',
+    type: String,
+  })
   @Get('keywords/:keyword')
   async getByKeyword(
     // @Auth() user: AuthUser,
@@ -110,6 +121,12 @@ export class GoogleSearchConsoleController {
 
   @ApiOperation({ summary: 'Get google search console by country' })
   @Get('countries/:country')
+  @ApiParam({
+    name: 'country',
+    description: 'Can be partial country name but should be unique',
+    example: 'spain',
+    type: String,
+  })
   async getByCountry(
     // @Auth() user: AuthUser,
     @Query() dto: GetByCountryDto,

@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleAnalyticsService } from './google-analytics.service';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetPagesDto } from './dto/get-pages.dto';
@@ -72,6 +77,12 @@ export class GoogleAnalyticsController {
   }
 
   @ApiOperation({ summary: 'Get google analytics by country' })
+  @ApiParam({
+    name: 'country',
+    description: 'Exact country name',
+    example: 'spain',
+    type: String,
+  })
   @Get('countries/:country')
   async getByCountry(
     // @Auth() user: AuthUser,
@@ -108,6 +119,12 @@ export class GoogleAnalyticsController {
   }
 
   @ApiOperation({ summary: 'Get google analytics by page' })
+  @ApiParam({
+    name: 'page',
+    description: 'Page path, for slash(/) on edge can be included or excluded',
+    example: '/coche-renting/bmw-serie-1-118d/',
+    type: String,
+  })
   @Get('pages/*page')
   async getByPage(
     // @Auth() user: AuthUser,
@@ -115,10 +132,12 @@ export class GoogleAnalyticsController {
     @Param('page') page: string,
   ) {
     // express v5 wildcard capture slash (/) as a comma (,)
-    const prefixPage = page.startsWith(',') ? '' : ',';
-    const suffixPage = page.endsWith(',') ? '' : ',';
-    const rawFullPage = `${prefixPage}${page}${suffixPage}`;
-    const fullPage = rawFullPage.replace(/,/g, '/');
+    const formattedPage = page.replace(/,/g, '/');
+    const prefixPage = formattedPage.startsWith('/') ? '' : '/';
+    const suffixPage = formattedPage.endsWith('/') ? '' : '/';
+    const fullPage = `${prefixPage}${formattedPage}${suffixPage}`;
+    console.log('Raw Page:', page);
+    console.log('Full Page:', fullPage);
 
     const data = await this.googleAnalyticsService.getByPage(
       dto,
