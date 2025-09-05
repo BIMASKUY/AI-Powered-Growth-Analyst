@@ -505,7 +505,6 @@ export class GoogleSearchConsoleService {
     siteUrl: string,
     startDate: string,
     endDate: string,
-    limit: number,
     keyword: string,
   ) {
     try {
@@ -515,7 +514,6 @@ export class GoogleSearchConsoleService {
           startDate,
           endDate,
           dimensions: ['query', 'date'],
-          rowLimit: limit,
           dimensionFilterGroups: [
             {
               filters: [
@@ -568,7 +566,6 @@ export class GoogleSearchConsoleService {
       siteUrl,
       dto.start_date,
       dto.end_date,
-      dto.limit,
       keyword,
     );
 

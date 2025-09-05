@@ -42,5 +42,5 @@ export class GetCountriesDto {
     example: 'es',
     description: 'filter countries contain this search term (case insensitive)',
   })
-  search: string;
+  search: string = '';
 }
