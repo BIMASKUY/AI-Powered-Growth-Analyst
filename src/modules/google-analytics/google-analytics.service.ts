@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, HttpException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { analyticsdata_v1beta, google } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
 import { GetOverallDto } from './dto/get-overall.dto';
@@ -65,7 +69,7 @@ export class GoogleAnalyticsService {
       googleOauth || {};
 
     if (!access_token || !refresh_token || !expiry_date || !scope) {
-      throw new HttpException('Google OAuth is required', 404);
+      throw new NotFoundException('Google OAuth is required');
     }
 
     const scopeArray = scope.trim().split(' ');
@@ -73,9 +77,8 @@ export class GoogleAnalyticsService {
       'https://www.googleapis.com/auth/analytics.readonly',
     );
     if (!isGoogleAnalyticsScope) {
-      throw new HttpException(
+      throw new NotFoundException(
         'google analytics scope is required on google oauth',
-        400,
       );
     }
 
@@ -155,8 +158,8 @@ export class GoogleAnalyticsService {
       });
       return data;
     } catch (error) {
-      this.logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 400);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -226,8 +229,8 @@ export class GoogleAnalyticsService {
       });
       return data;
     } catch (error) {
-      this.logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -319,8 +322,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      Logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -446,8 +449,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      Logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -539,8 +542,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      Logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -629,8 +632,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      Logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -718,8 +721,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      Logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -807,8 +810,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      Logger.error(error.message, 'GoogleAnalyticsService');
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new BadRequestException(error.message);
     }
   }
 

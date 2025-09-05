@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   Logger,
-  HttpException,
   ForbiddenException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { google, searchconsole_v1 } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
@@ -85,7 +84,7 @@ export class GoogleSearchConsoleService {
       googleOauth || {};
 
     if (!access_token || !refresh_token || !expiry_date || !scope) {
-      throw new HttpException('Google OAuth is required', 404);
+      throw new NotFoundException('Google OAuth is required');
     }
 
     const scopeArray = scope.trim().split(' ');
@@ -93,9 +92,8 @@ export class GoogleSearchConsoleService {
       'https://www.googleapis.com/auth/webmasters.readonly',
     );
     if (!isGoogleSearchConsoleScope) {
-      throw new HttpException(
+      throw new BadRequestException(
         'google search console scope is required on google oauth',
-        400,
       );
     }
 
@@ -136,9 +134,8 @@ export class GoogleSearchConsoleService {
     const { property, property_type } = googleSearchConsole || {};
 
     if (!property || !property_type) {
-      throw new HttpException(
+      throw new NotFoundException(
         'google search console property and property_type are required',
-        404,
       );
     }
 
@@ -224,12 +221,8 @@ export class GoogleSearchConsoleService {
       });
       return data;
     } catch (error) {
-      Logger.error(
-        'access denied error',
-        error.message,
-        'GoogleSearchConsoleService',
-      );
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new ForbiddenException(error.message);
     }
   }
 
@@ -310,12 +303,8 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      Logger.error(
-        'access denied error',
-        error.message,
-        'GoogleSearchConsoleService',
-      );
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new ForbiddenException(error.message);
     }
   }
 
@@ -418,12 +407,8 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      Logger.error(
-        'access denied error',
-        error.message,
-        'GoogleSearchConsoleService',
-      );
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new ForbiddenException(error.message);
     }
   }
 
@@ -532,12 +517,8 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      Logger.error(
-        `access denied error`,
-        error.message,
-        'GoogleSearchConsoleService',
-      );
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new ForbiddenException(error.message);
     }
   }
 
@@ -611,11 +592,7 @@ export class GoogleSearchConsoleService {
       });
       return data;
     } catch (error) {
-      Logger.error(
-        'access denied error',
-        error.message,
-        'GoogleSearchConsoleService',
-      );
+      this.logger.error(error.message);
       throw new ForbiddenException(error.message);
     }
   }
@@ -742,12 +719,8 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      Logger.error(
-        'access denied error',
-        error.message,
-        'GoogleSearchConsoleService',
-      );
-      throw new HttpException(error.message, 403);
+      this.logger.error(error.message);
+      throw new ForbiddenException(error.message);
     }
   }
 
