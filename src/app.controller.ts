@@ -6,6 +6,6 @@ import { ApiTags } from '@nestjs/swagger';
 export class AppController {
   @Get()
   root(): string {
-    return 'Welcome to the API';
+    return 'API is running! Check /docs for API documentation';
   }
 }

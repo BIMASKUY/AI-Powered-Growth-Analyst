@@ -16,7 +16,7 @@ export class GetCountriesDto {
   start_date: string;
 
   @IsDateString({ strict: true })
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: '2025-01-31',
   })
   end_date: string;
