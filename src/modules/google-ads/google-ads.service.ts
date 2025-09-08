@@ -175,11 +175,11 @@ export class GoogleAdsService {
     const ctrPercent = campaigns.metrics.ctr
       ? roundNumber<number>(campaigns.metrics.ctr * 100)
       : campaigns.metrics.ctr;
-    const spendFieldName = `spend_${currencyCode}`;
 
     return {
       impressions: campaigns.metrics.impressions,
-      [spendFieldName]: roundedSpend,
+      currency: currencyCode,
+      spend: roundedSpend,
       conversion_rate_percent: conversionRatePercent,
       ctr_percent: ctrPercent,
       roi_percent: roiPercent,
@@ -260,12 +260,10 @@ export class GoogleAdsService {
         ? roundNumber<number>(campaign.metrics.ctr * 100)
         : campaign.metrics.ctr;
 
-      const spendFieldName = `spend_${currencyCode}`;
-
       return {
         date: campaign.segments.date,
-        impressions: campaign.metrics.impressions,
-        [spendFieldName]: roundedSpend,
+        currency: currencyCode,
+        spend: roundedSpend,
         conversion_rate_percent: conversionRatePercent,
         ctr_percent: ctrPercent,
         roi_percent: roiPercent,
@@ -344,14 +342,13 @@ export class GoogleAdsService {
           ? roundNumber<number>(campaign.metrics.ctr * 100)
           : campaign.metrics.ctr;
 
-        const spendFieldName = `spend_${currencyCode}`;
-
         return {
           id,
           name: campaign.campaign.name,
           status,
           impressions: campaign.metrics.impressions,
-          [spendFieldName]: roundedSpend,
+          currency: currencyCode,
+          spend: roundedSpend,
           conversion_rate_percent: conversionRatePercent,
           ctr_percent: ctrPercent,
           roi_percent: roiPercent,
@@ -426,12 +423,11 @@ export class GoogleAdsService {
         ? roundNumber<number>(campaign.metrics.ctr * 100)
         : campaign.metrics.ctr;
 
-      const spendFieldName = `spend_${currencyCode}`;
-
       return {
         date: campaign.segments.date,
         impressions: campaign.metrics.impressions,
-        [spendFieldName]: roundedSpend,
+        currency: currencyCode,
+        spend: roundedSpend,
         conversion_rate_percent: conversionRatePercent,
         ctr_percent: ctrPercent,
         roi_percent: roiPercent,
