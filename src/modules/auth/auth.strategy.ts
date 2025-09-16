@@ -17,9 +17,9 @@ export class AuthStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: Payload) {
-    this.logger.log(`current user id: ${payload.user_id}`);
+    this.logger.log(`current user id: ${payload.id}`);
     return {
-      user_id: payload.user_id
+      id: payload.id
     };
   }
 }

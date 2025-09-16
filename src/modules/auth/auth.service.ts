@@ -52,7 +52,7 @@ export class AuthService {
         )
       );
 
-      this.logger.log(data.access_token)
+      this.logger.log('Access token obtained successfully');
 
       return {
         data: data.access_token,
@@ -97,7 +97,7 @@ export class AuthService {
   }
 
   private  generateJwtToken(userId: string) {
-    const payload = { user_id: userId };
+    const payload = { id: userId };
     const token = this.jwtService.sign(payload);
     return token;
   };

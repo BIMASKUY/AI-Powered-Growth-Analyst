@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export interface MicrosoftOAuth {
   token_type: string;
   scope: string;
@@ -23,7 +25,15 @@ export interface MicrosoftGraphUser {
 }
 
 export interface Payload {
-  user_id: string;
+  id: string;
   iat: number;
   exp: number;
+}
+
+export interface AuthUser {
+  id: string;
+}
+
+export interface AuthenticatedRequest extends Request {
+  user: AuthUser;
 }

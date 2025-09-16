@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleAdsService } from './google-ads.service';
 import {
@@ -8,8 +7,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { AuthGuard} from '../auth/auth.guard';
-// import { Auth } from '../common/decorator/auth.decorator';
-// import { AuthUser } from '../common/types/types';
+import { Auth } from '../auth/auth.decorator';
+import { AuthUser } from '../auth/auth.type';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';
@@ -25,10 +24,10 @@ export class GoogleAdsController {
   @ApiOperation({ summary: 'Get google ads overall' })
   @Get('overall')
   async getOverall(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetOverallDto,
   ) {
-    const data = await this.googleAdsService.getOverall(dto, 'test-client-id');
+    const data = await this.googleAdsService.getOverall(dto, user.id);
     const message = 'google ads overall fetched successfully';
     return {
       message,
