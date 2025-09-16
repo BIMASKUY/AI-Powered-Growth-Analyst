@@ -7,7 +7,7 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-// import { AuthGuard } from '../auth/guards/auth.guard';
+import { AuthGuard} from '../auth/auth.guard';
 // import { Auth } from '../common/decorator/auth.decorator';
 // import { AuthUser } from '../common/types/types';
 import { GetOverallDto } from './dto/get-overall.dto';
@@ -15,8 +15,8 @@ import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';
 import { GetCampaignByIdDto } from './dto/get-campaign-by-id.dto';
 
-// @ApiBearerAuth()
-// @UseGuards(AuthGuard)
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @ApiTags('Google Ads')
 @Controller('google-ads')
 export class GoogleAdsController {
