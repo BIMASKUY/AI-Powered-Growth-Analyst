@@ -38,10 +38,10 @@ export class GoogleAdsController {
   @ApiOperation({ summary: 'Get google ads daily' })
   @Get('daily')
   async getDaily(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetDailyDto,
   ) {
-    const data = await this.googleAdsService.getDaily(dto, 'test-client-id');
+    const data = await this.googleAdsService.getDaily(dto, user.id);
     const message = 'google ads daily fetched successfully';
     return {
       message,
@@ -52,12 +52,12 @@ export class GoogleAdsController {
   @ApiOperation({ summary: 'Get google ads campaigns' })
   @Get('campaigns')
   async getCampaigns(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetCampaignsDto,
   ) {
     const data = await this.googleAdsService.getCampaigns(
       dto,
-      'test-client-id',
+      user.id
     );
     const message = 'google ads campaigns fetched successfully';
     return {
@@ -75,14 +75,14 @@ export class GoogleAdsController {
   })
   @Get('campaigns/:id')
   async getCampaignById(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetCampaignByIdDto,
     @Param('id') id: string,
   ) {
     const data = await this.googleAdsService.getCampaignById(
       dto,
       id,
-      'test-client-id',
+      user.id,
     );
     const message = 'google ads campaign by id fetched successfully';
     return {

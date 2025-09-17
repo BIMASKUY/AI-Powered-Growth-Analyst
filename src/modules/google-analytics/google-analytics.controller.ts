@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleAnalyticsService } from './google-analytics.service';
 import {
@@ -7,6 +6,9 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { AuthGuard } from '../auth/auth.guard';
+import { Auth } from '../auth/auth.decorator';
+import { AuthUser } from '../auth/auth.type';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetPagesDto } from './dto/get-pages.dto';
@@ -16,8 +18,8 @@ import { GetByCountryDto } from './dto/get-by-country.dto';
 import { GetOverallOrganicDto } from './dto/get-overall-organic.dto';
 import { GetDailyOrganicDto } from './dto/get-daily-organic.dto';
 
-// @ApiBearerAuth()
-// @UseGuards(AuthGuard)
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @ApiTags('Google Analytics')
 @Controller('google-analytics')
 export class GoogleAnalyticsController {
@@ -29,11 +31,11 @@ export class GoogleAnalyticsController {
   @Get('overall')
   async getOverall(
     @Query() dto: GetOverallDto,
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
   ) {
     const data = await this.googleAnalyticsService.getOverall(
       dto,
-      'test-client-id',
+      user.id,
     );
     const message = 'google analytics overall fetched successfully';
     return {
@@ -46,11 +48,11 @@ export class GoogleAnalyticsController {
   @Get('daily')
   async getDaily(
     @Query() dto: GetDailyDto,
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
   ) {
     const data = await this.googleAnalyticsService.getDaily(
       dto,
-      'test-client-id',
+      user.id,
     );
     const message = 'google analytics daily fetched successfully';
     return {
@@ -62,12 +64,12 @@ export class GoogleAnalyticsController {
   @ApiOperation({ summary: 'Get google analytics countries' })
   @Get('countries')
   async getCountries(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetCountriesDto,
   ) {
     const data = await this.googleAnalyticsService.getCountries(
       dto,
-      'test-client-id',
+      user.id,
     );
     const message = 'google analytics countries fetched successfully';
     return {
@@ -85,14 +87,14 @@ export class GoogleAnalyticsController {
   })
   @Get('countries/:country')
   async getByCountry(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetByCountryDto,
     @Param('country') country: string,
   ) {
     const data = await this.googleAnalyticsService.getByCountry(
       dto,
       country,
-      'test-client-id',
+      user.id,
     );
     const message = 'google analytics country fetched successfully';
     return {
@@ -105,11 +107,11 @@ export class GoogleAnalyticsController {
   @Get('pages')
   async getPages(
     @Query() dto: GetPagesDto,
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
   ) {
     const data = await this.googleAnalyticsService.getPages(
       dto,
-      'test-client-id',
+      user.id,
     );
     const message = 'google analytics pages fetched successfully';
     return {
@@ -127,7 +129,7 @@ export class GoogleAnalyticsController {
   })
   @Get('pages/*page')
   async getByPage(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetByPageDto,
     @Param('page') page: string,
   ) {
@@ -142,7 +144,7 @@ export class GoogleAnalyticsController {
     const data = await this.googleAnalyticsService.getByPage(
       dto,
       fullPage,
-      'test-client-id',
+      user.id,
     );
     const message = 'google analytics by page fetched successfully';
     return {
@@ -154,12 +156,12 @@ export class GoogleAnalyticsController {
   @ApiOperation({ summary: 'Get google analytics overall organic traffic' })
   @Get('overall-organic')
   async getOverallOrganic(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetOverallOrganicDto,
   ) {
     const data = await this.googleAnalyticsService.getOverallOrganic(
       dto,
-      'test-client-id',
+      user.id,
     );
     const message =
       'google analytics overall organic traffic fetched successfully';
@@ -172,12 +174,12 @@ export class GoogleAnalyticsController {
   @ApiOperation({ summary: 'Get google analytics daily organic traffic' })
   @Get('daily-organic')
   async getDailyOrganic(
-    // @Auth() user: AuthUser,
+    @Auth() user: AuthUser,
     @Query() dto: GetDailyOrganicDto,
   ) {
     const data = await this.googleAnalyticsService.getDailyOrganic(
       dto,
-      'test-client-id',
+      user.id,
     );
     const message =
       'google analytics daily organic traffic fetched successfully';
