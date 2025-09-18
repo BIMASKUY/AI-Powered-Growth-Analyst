@@ -5,6 +5,8 @@ import { GoogleAnalyticsModule } from './modules/google-analytics/google-analyti
 import { GoogleAdsModule } from './modules/google-ads/google-ads.module';
 import { GoogleSearchConsoleModule } from './modules/google-search-console/google-search-console.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { GoogleOauthModule } from './modules/google-oauth/google-oauth.module';
+import { CosmosModule } from './modules/cosmos/cosmos.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { AuthModule } from './modules/auth/auth.module';
       envFilePath: '.env',
     }),
     AuthModule,
+    GoogleOauthModule,
+    CosmosModule,
     GoogleAnalyticsModule,
     GoogleSearchConsoleModule,
     GoogleAdsModule,
