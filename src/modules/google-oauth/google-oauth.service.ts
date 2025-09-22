@@ -1,20 +1,12 @@
-import {
-  Injectable,
-  Logger,
-  ConflictException,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateDto } from './dto/create.dto';
-import {
-  OAuth2Client,
-  OAuth2ClientOptions,
-} from 'google-auth-library';
+import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
 // import { RedisService } from '../common/service/redis.service';
 import { GoogleOauthRepository } from './google-oauth.repository';
 import { GoogleOauthEntity } from './entities/google-oauth.entity';
+import { Platform, Scope } from './google-oauth.enum';
 
 @Injectable()
 export class GoogleOauthService {
@@ -147,5 +139,53 @@ export class GoogleOauthService {
     // await this.redisService.delete(userId);
 
     return null;
+  }
+
+  private getScopeFromPlatform(platform: Platform) {
+    switch (platform) {
+      case Platform.GOOGLE_ANALYTICS:
+        return Scope.GOOGLE_ANALYTICS;
+      case Platform.GOOGLE_SEARCH_CONSOLE:
+        return Scope.GOOGLE_SEARCH_CONSOLE;
+      case Platform.GOOGLE_ADS:
+        return Scope.GOOGLE_ADS;
+      default:
+        this.logger.error(`invalid platform: ${platform}`);
+        return null;
+    }
+  }
+
+  async getOauth2Client(platform: Platform, clientId: string) {
+    const googleOauth = await this.googleOauthRepository.getByUserId(clientId);
+    if (!googleOauth) {
+      return {
+        data: null,
+        error: 'google oauth not found',
+      }
+    }
+
+    const scope = this.getScopeFromPlatform(platform);
+
+    const scopeArray = googleOauth.scope.trim().split(' ');
+    const hasScope = scopeArray.includes(scope);
+    if (!hasScope) {
+      return {
+        data: null,
+        error: `${platform} scope is required on google oauth`,
+      }
+    }
+
+    const oauth2Client = new OAuth2Client(this.oauth2ClientSchema);
+
+    oauth2Client.setCredentials({
+      access_token: googleOauth.access_token,
+      refresh_token: googleOauth.refresh_token,
+      expiry_date: googleOauth.expiry_date,
+    });
+
+    return {
+      data: oauth2Client,
+      error: null,
+    }
   }
 }

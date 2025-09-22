@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   Logger,
@@ -10,10 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { analyticsdata_v1beta, google } from 'googleapis';
-import { ConfigService } from '@nestjs/config';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { formatDate, roundNumber } from 'src/utils/global.utils';
-import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetPagesDto } from './dto/get-pages.dto';
 import { GetByPageDto } from './dto/get-by-page.dto';
@@ -21,109 +14,35 @@ import { GetCountriesDto } from './dto/get-countries.dto';
 import { GetByCountryDto } from './dto/get-by-country.dto';
 import { GetOverallOrganicDto } from './dto/get-overall-organic.dto';
 import { GetDailyOrganicDto } from './dto/get-daily-organic.dto';
+import { GoogleOauthService } from '../google-oauth/google-oauth.service';
+import { Platform } from '../google-oauth/google-oauth.enum';
+import { GoogleAnalyticsRepository } from './google-analytics.repository';
 
 @Injectable()
 export class GoogleAnalyticsService {
-  private readonly oauth2ClientSchema: OAuth2ClientOptions;
   private readonly logger = new Logger(GoogleAnalyticsService.name);
-  private readonly STATIC_OAUTH2_CLIENT_FOR_TESTING: any;
-  private readonly TESTING_GA_PROPERTY_ID: string;
-  // private readonly SERVICE_NAME = 'google-analytics';
+  private readonly SERVICE_NAME = Platform.GOOGLE_ANALYTICS;
 
-  constructor(private readonly configService: ConfigService) {
-    const env = this.configService.getOrThrow('ENV');
-    const redirectUri =
-      env === 'dev'
-        ? this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_DEV')
-        : this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_PROD');
-
-    this.oauth2ClientSchema = {
-      clientId: this.configService.getOrThrow('GOOGLE_CLIENT_ID'),
-      clientSecret: this.configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
-      redirectUri,
-    };
-
-    this.STATIC_OAUTH2_CLIENT_FOR_TESTING = {
-      access_token: this.configService.getOrThrow('TESTING_ACCESS_TOKEN'),
-      refresh_token: this.configService.getOrThrow('TESTING_REFRESH_TOKEN'),
-      expiry_date: this.configService.getOrThrow('TESTING_EXPIRY_DATE'),
-      scope: this.configService.getOrThrow('TESTING_SCOPE'),
-    };
-
-    this.TESTING_GA_PROPERTY_ID = this.configService.getOrThrow(
-      'TESTING_GA_PROPERTY_ID',
-    );
-  }
-
-  private async getOauth2Client(clientId: string) {
-    // const { data: googleOauth, error } = await this.supabaseService
-    // .getClient()
-    // .from('google_oauth')
-    // .select('access_token, refresh_token, expiry_date, scope')
-    // .eq('client_id', clientId)
-    // .maybeSingle();
-
-    const googleOauth = this.STATIC_OAUTH2_CLIENT_FOR_TESTING;
-
-    const { access_token, refresh_token, expiry_date, scope } =
-      googleOauth || {};
-
-    if (!access_token || !refresh_token || !expiry_date || !scope) {
-      throw new NotFoundException('Google OAuth is required');
-    }
-
-    const scopeArray = scope.trim().split(' ');
-    const isGoogleAnalyticsScope = scopeArray.includes(
-      'https://www.googleapis.com/auth/analytics.readonly',
-    );
-    if (!isGoogleAnalyticsScope) {
-      throw new NotFoundException(
-        'google analytics scope is required on google oauth',
-      );
-    }
-
-    const oauth2Client = new OAuth2Client(this.oauth2ClientSchema);
-
-    oauth2Client.setCredentials({
-      access_token,
-      refresh_token,
-      expiry_date,
-    });
-
-    return oauth2Client;
-  }
-
-  private async getPropertyId(clientId: string) {
-    // const { data: googleAnalytics, error } = await this.supabaseService
-    //   .getClient()
-    //   .from('google_analytics')
-    //   .select('property_id')
-    //   .eq('client_id', clientId)
-    //   .maybeSingle();
-
-    // const { property_id } = googleAnalytics || {};
-
-    // if (!property_id)
-    //   throw new HttpException('google analytics property_id is required', 404);
-
-    // if (error) {
-    //   this.error(
-    //     error.message,
-    //     'GoogleAnalyticsService',
-    //   );
-    //   throw new HttpException('google analytics error', 500);
-    // }
-
-    const property_id = this.TESTING_GA_PROPERTY_ID;
-
-    return property_id;
+  constructor(
+      private readonly googleOauthService: GoogleOauthService,
+      private readonly googleAnalyticsRepository: GoogleAnalyticsRepository,
+    ) {
   }
 
   private async getGoogleAnalytics(clientId: string) {
-    const [propertyId, oauth2Client] = await Promise.all([
-      this.getPropertyId(clientId),
-      this.getOauth2Client(clientId),
+    const [propertyId, currentOauth2Client] = await Promise.all([
+      this.googleAnalyticsRepository.getPropertyId(clientId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
     ]);
+
+    if (!propertyId) {
+      throw new NotFoundException('google analytics property_id is required');
+    }
+
+    const { data: oauth2Client, error } = currentOauth2Client;
+    if (error) {
+      throw new NotFoundException(error);
+    }
 
     const analytics: analyticsdata_v1beta.Analyticsdata = google.analyticsdata({
       version: 'v1beta',
@@ -859,7 +778,10 @@ export class GoogleAnalyticsService {
   }
 
   async getAllPropertyIds(clientId: string) {
-    const oauth2Client = await this.getOauth2Client(clientId);
+    const { data: oauth2Client, error } = await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId);
+    if (error) {
+      throw new NotFoundException(error);
+    }
 
     const analytics = google.analyticsadmin({
       version: 'v1beta',
@@ -868,14 +790,14 @@ export class GoogleAnalyticsService {
 
     const rawAccount = await analytics.accounts.list();
     const account = rawAccount.data?.accounts?.[0];
-    if (!account) return [] as string[];
+    if (!account) return [] as { property_id: string; property_name: string }[];
 
     const propertiesResponse = await analytics.properties.list({
       filter: `parent:${account.name}`,
     });
 
     const properties = propertiesResponse.data?.properties;
-    if (!properties) return [] as string[];
+    if (!properties) return [] as { property_id: string; property_name: string }[];
 
     const formattedProperties = properties.map((property) => {
       const propertyId = property.name.split('/').pop();
@@ -891,19 +813,20 @@ export class GoogleAnalyticsService {
   }
 
   async getCurrentProperty(clientId: string) {
-    const propertyId = await this.getPropertyId(clientId);
-    const oauth2Client = await this.getOauth2Client(clientId);
+    const propertyId = await this.googleAnalyticsRepository.getPropertyId(clientId);
+    const { data: oauth2Client, error } = await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId);
+    if (error) {
+      throw new NotFoundException(error);
+    }
 
     const analyticsAdmin = google.analyticsadmin({
       version: 'v1beta',
       auth: oauth2Client,
     });
 
-    const propertyResponse = await analyticsAdmin.properties.get({
+    const { data: property } = await analyticsAdmin.properties.get({
       name: `properties/${propertyId}`,
     });
-
-    const property = propertyResponse.data;
 
     return {
       property_id: propertyId,

@@ -7,6 +7,7 @@ import { GoogleSearchConsoleModule } from './modules/google-search-console/googl
 import { AuthModule } from './modules/auth/auth.module';
 import { GoogleOauthModule } from './modules/google-oauth/google-oauth.module';
 import { CosmosModule } from './modules/cosmos/cosmos.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CosmosModule } from './modules/cosmos/cosmos.module';
     AuthModule,
     GoogleOauthModule,
     CosmosModule,
+    PlatformModule,
     GoogleAnalyticsModule,
     GoogleSearchConsoleModule,
     GoogleAdsModule,
