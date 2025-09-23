@@ -776,7 +776,7 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getAllPropertyIds(clientId: string) {
+  async getAllProperties(clientId: string) {
     const { data: oauth2Client, error } =
       await this.googleOauthService.getOauth2Client(
         this.SERVICE_NAME,
@@ -805,11 +805,11 @@ export class GoogleAnalyticsService {
 
     const formattedProperties = properties.map((property) => {
       const propertyId = property.name.split('/').pop();
-      const name = property.displayName;
+      const propertyName = property.displayName;
 
       return {
         property_id: propertyId,
-        name,
+        property_name: propertyName,
       };
     });
 
@@ -817,13 +817,12 @@ export class GoogleAnalyticsService {
   }
 
   async getCurrentProperty(clientId: string) {
-    const propertyId =
-      await this.googleAnalyticsRepository.getPropertyId(clientId);
-    const { data: oauth2Client, error } =
-      await this.googleOauthService.getOauth2Client(
-        this.SERVICE_NAME,
-        clientId,
-      );
+    const [propertyId, currentOauth2Client] = await Promise.all([
+      this.googleAnalyticsRepository.getPropertyId(clientId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
+    ]);
+
+    const { data: oauth2Client, error } = currentOauth2Client;
     if (error) {
       throw new NotFoundException(error);
     }
@@ -839,7 +838,7 @@ export class GoogleAnalyticsService {
 
     return {
       property_id: propertyId,
-      name: property.displayName,
+      property_name: property.displayName,
     };
   }
 }

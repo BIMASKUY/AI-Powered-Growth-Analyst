@@ -5,9 +5,15 @@ import { PlatformRepository } from './platform.repository';
 import { CosmosModule } from '../cosmos/cosmos.module';
 import { GoogleOauthModule } from '../google-oauth/google-oauth.module';
 import { GoogleAnalyticsModule } from '../google-analytics/google-analytics.module';
+import { GoogleSearchConsoleModule } from '../google-search-console/google-search-console.module';
 
 @Module({
-  imports: [CosmosModule, GoogleOauthModule, GoogleAnalyticsModule],
+  imports: [
+    CosmosModule,
+    GoogleOauthModule,
+    GoogleAnalyticsModule,
+    GoogleSearchConsoleModule,
+  ],
   controllers: [PlatformController],
   providers: [PlatformService, PlatformRepository],
   exports: [PlatformService],

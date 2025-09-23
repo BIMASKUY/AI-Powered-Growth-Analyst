@@ -23,7 +23,7 @@ class GoogleSearchConsoleDto {
   @ApiProperty({
     example: 'vamos.es',
   })
-  property: string;
+  property_name: string;
 }
 
 class GoogleAdsDto {

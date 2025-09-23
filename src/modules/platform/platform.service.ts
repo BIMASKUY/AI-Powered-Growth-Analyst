@@ -6,39 +6,27 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { UpsertDto } from './dto/upsert.dto';
-import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
-import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
 // import { RedisService } from '../common/service/redis.service';
 import { PlatformRepository } from './platform.repository';
-import { PlatformEntity } from './entities/platform.entity';
 import { GoogleOauthService } from '../google-oauth/google-oauth.service';
 import { GoogleAnalyticsService } from '../google-analytics/google-analytics.service';
+import { GoogleAnalytics } from './platform.type';
+import { GoogleSearchConsoleService } from '../google-search-console/google-search-console.service';
+import { GoogleSearchConsoleRepository } from '../google-search-console/google-search-console.repository';
 
 @Injectable()
 export class PlatformService {
   private readonly logger = new Logger(PlatformService.name);
-  private readonly oauth2ClientSchema: OAuth2ClientOptions;
 
   constructor(
-    private readonly configService: ConfigService,
     // private readonly redisService: RedisService,
     private readonly platformRepository: PlatformRepository,
     private readonly googleOauthService: GoogleOauthService,
     private readonly googleAnalyticsService: GoogleAnalyticsService,
-  ) {
-    const env = this.configService.getOrThrow('ENV');
-    const isDevelopment = env === 'dev';
-    const redirectUri = isDevelopment
-      ? this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_DEV')
-      : this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_PROD');
-
-    this.oauth2ClientSchema = {
-      clientId: this.configService.getOrThrow('GOOGLE_CLIENT_ID'),
-      clientSecret: this.configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
-      redirectUri,
-    };
-  }
+    private readonly googleSearchConsoleService: GoogleSearchConsoleService,
+    private readonly googleSearchConsoleRepository: GoogleSearchConsoleRepository,
+  ) {}
 
   private async getGoogleOauth(userId: string) {
     try {
@@ -48,6 +36,7 @@ export class PlatformService {
         error: null,
       };
     } catch (error) {
+      this.logger.error(error.massage);
       return {
         data: null,
         error: 'google oauth not found',
@@ -67,35 +56,63 @@ export class PlatformService {
 
   private async getGoogleAnalytics(clientId: string) {
     try {
-      const [currentPropertyId, allPropertyIds] = await Promise.all([
+      const [currentProperty, allProperties] = await Promise.all([
         this.googleAnalyticsService.getCurrentProperty(clientId),
-        this.googleAnalyticsService.getAllPropertyIds(clientId),
+        this.googleAnalyticsService.getAllProperties(clientId),
       ]);
 
       return {
         connected: true,
-        current: currentPropertyId,
-        options: allPropertyIds,
+        current: currentProperty,
+        options: allProperties,
       };
     } catch (error) {
+      this.logger.error(error);
       return {
         connected: false,
         current: {
           property_id: '',
           property_name: '',
         },
-        options: [] as { property_id: string; property_name: string }[],
+        options: [] as GoogleAnalytics[],
       };
     }
   }
 
-  // private async getGoogleSearchConsole(clientId: string){
+  private async getGoogleSearchConsole(clientId: string) {
+    try {
+      const [currentProperty, allProperties] = await Promise.all([
+        this.googleSearchConsoleRepository.getProperty(clientId),
+        this.googleSearchConsoleService.getAllProperties(clientId),
+      ]);
+
+      return {
+        connected: true,
+        current: currentProperty,
+        options: allProperties,
+      };
+    } catch (error) {
+      this.logger.log(error.message);
+      return {
+        connected: false,
+        current: {
+          property_type: '',
+          property_name: '',
+        },
+        options: [] as GoogleSearchConsoleService[],
+      };
+    }
+  }
 
   private async getConnectedPlatforms(userId: string) {
-    const googleAnalytics = await this.getGoogleAnalytics(userId);
+    const [googleAnalytics, googleSearchConsole] = await Promise.all([
+      this.getGoogleAnalytics(userId),
+      this.getGoogleSearchConsole(userId),
+    ]);
 
     return {
       googleAnalytics,
+      googleSearchConsole,
     };
   }
 
@@ -107,10 +124,11 @@ export class PlatformService {
 
     const platform = await this.platformRepository.getByUserId(userId);
 
-    const { googleAnalytics } = await this.getConnectedPlatforms(userId);
+    const { googleAnalytics, googleSearchConsole } = await this.getConnectedPlatforms(userId);
 
     return {
       google_analytics: googleAnalytics,
+      google_search_console: googleSearchConsole,
     };
   }
 }

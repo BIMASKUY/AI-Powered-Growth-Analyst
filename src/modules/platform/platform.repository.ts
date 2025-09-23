@@ -49,7 +49,7 @@ export class PlatformRepository implements OnModuleInit {
         },
         google_search_console: {
           property_type: google_search_console.property_type,
-          property: google_search_console.property,
+          property_name: google_search_console.property_name,
         },
         google_ads: {
           manager_account_developer_token:
@@ -61,12 +61,12 @@ export class PlatformRepository implements OnModuleInit {
     };
   }
 
-  private formatGetByUserId(resource: PlatformEntity | null) {
+  private formatGetByUserId(resource: PlatformEntity | null): PlatformEntity {
     const { id, user_id, platforms } = resource || {};
     const { google_analytics, google_search_console, google_ads } =
       platforms || {};
     const { property_id } = google_analytics || {};
-    const { property_type, property } = google_search_console || {};
+    const { property_type, property_name } = google_search_console || {};
     const { manager_account_developer_token, customer_account_id } =
       google_ads || {};
 
@@ -78,7 +78,7 @@ export class PlatformRepository implements OnModuleInit {
         },
         google_search_console: {
           property_type: property_type || '',
-          property: property || '',
+          property_name: property_name || '',
         },
         google_ads: {
           manager_account_developer_token:

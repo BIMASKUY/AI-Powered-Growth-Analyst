@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
@@ -13,7 +13,6 @@ import {
 import { google, searchconsole_v1 } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
 import { roundNumber } from 'src/utils/global.utils';
-import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
 import ISO from 'iso-3166-1';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
@@ -22,134 +21,42 @@ import { GetByKeywordDto } from './dto/get-by-keyword.dto';
 import { compareAsc } from 'date-fns';
 import { GetCountriesDto } from './dto/get-countries.dto';
 import { GetByCountryDto } from './dto/get-by-country.dto';
+import { GoogleOauthService } from '../google-oauth/google-oauth.service';
+import { Platform } from '../google-oauth/google-oauth.enum';
+import { GoogleSearchConsoleRepository } from './google-search-console.repository';
+import { PropertyType } from '../platform/platform.enum';
+import { GoogleSearchConsole } from '../platform/entities/google-search-console.entity';
 // import { RedisService } from '../common/service/redis.service';
 
 @Injectable()
 export class GoogleSearchConsoleService {
-  private readonly oauth2ClientSchema: OAuth2ClientOptions;
-  private readonly SERVICE_NAME = 'google-search-console';
-  private readonly STATIC_OAUTH2_CLIENT_FOR_TESTING: any;
-  private readonly STATIC_GOOGLE_SEARCH_CONSOLE_FOR_TESTING: any;
+  private readonly SERVICE_NAME = Platform.GOOGLE_SEARCH_CONSOLE;
   private readonly logger = new Logger(GoogleSearchConsoleService.name);
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly googleOauthService: GoogleOauthService,
+    private readonly googleSearchConsoleRepository: GoogleSearchConsoleRepository,
     // private readonly redisService: RedisService,
-  ) {
-    const env = this.configService.getOrThrow('ENV');
-    const redirectUri =
-      env === 'dev'
-        ? this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_DEV')
-        : this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_PROD');
-
-    this.oauth2ClientSchema = {
-      clientId: this.configService.getOrThrow('GOOGLE_CLIENT_ID'),
-      clientSecret: this.configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
-      redirectUri,
-    };
-
-    this.STATIC_OAUTH2_CLIENT_FOR_TESTING = {
-      access_token: this.configService.getOrThrow('TESTING_ACCESS_TOKEN'),
-      refresh_token: this.configService.getOrThrow('TESTING_REFRESH_TOKEN'),
-      expiry_date: this.configService.getOrThrow('TESTING_EXPIRY_DATE'),
-      scope: this.configService.getOrThrow('TESTING_SCOPE'),
-    };
-
-    this.STATIC_GOOGLE_SEARCH_CONSOLE_FOR_TESTING = {
-      property: this.configService.getOrThrow('TESTING_GSC_PROPERTY'),
-      property_type: this.configService.getOrThrow('TESTING_GSC_PROPERTY_TYPE'),
-    };
-  }
-
-  private async getOauth2Client(clientId: string) {
-    // const { data: googleOauth, error } = await this.supabaseService
-    //   .getClient()
-    //   .from('google_oauth')
-    //   .select('access_token, refresh_token, expiry_date, scope')
-    //   .eq('client_id', clientId)
-    //   .maybeSingle();
-
-    // if (error) {
-    //   Logger.error(
-    //     'Failed to get google oauth tokens',
-    //     error.message,
-    //     'GoogleSearchConsoleService',
-    //   );
-    //   throw new HttpException('Failed to get google oauth tokens', 500);
-    // }
-
-    const googleOauth = this.STATIC_OAUTH2_CLIENT_FOR_TESTING;
-
-    const { access_token, refresh_token, expiry_date, scope } =
-      googleOauth || {};
-
-    if (!access_token || !refresh_token || !expiry_date || !scope) {
-      throw new NotFoundException('Google OAuth is required');
-    }
-
-    const scopeArray = scope.trim().split(' ');
-    const isGoogleSearchConsoleScope = scopeArray.includes(
-      'https://www.googleapis.com/auth/webmasters.readonly',
-    );
-    if (!isGoogleSearchConsoleScope) {
-      throw new BadRequestException(
-        'google search console scope is required on google oauth',
-      );
-    }
-
-    const oauth2Client = new OAuth2Client(this.oauth2ClientSchema);
-
-    oauth2Client.setCredentials({
-      access_token,
-      refresh_token,
-      expiry_date,
-    });
-
-    return oauth2Client;
-  }
-
-  private async getSiteUrl(clientId: string) {
-    // const { data: googleSearchConsole, error } = await this.supabaseService
-    //   .getClient()
-    //   .from('google_search_console')
-    //   .select('property, property_type')
-    //   .eq('client_id', clientId)
-    //   .maybeSingle();
-
-    // if (error) {
-    //   Logger.error(
-    //     'error fetching google search console property from supabase',
-    //     error.message,
-    //     'GoogleSearchConsoleService',
-    //   );
-    //   throw new HttpException(
-    //     'error fetching google search console property from supabase',
-    //     500,
-    //   );
-    // }
-
-    // for testing only
-    const googleSearchConsole = this.STATIC_GOOGLE_SEARCH_CONSOLE_FOR_TESTING;
-
-    const { property, property_type } = googleSearchConsole || {};
-
-    if (!property || !property_type) {
-      throw new NotFoundException(
-        'google search console property and property_type are required',
-      );
-    }
-
-    const siteUrl: string =
-      property_type === 'domain' ? `sc-domain:${property}` : property;
-
-    return siteUrl;
-  }
+  ) {}
 
   private async getGoogleSearchConsole(clientId: string) {
-    const [oauth2Client, siteUrl] = await Promise.all([
-      this.getOauth2Client(clientId),
-      this.getSiteUrl(clientId),
+    const [property, currentOauth2Client] = await Promise.all([
+      this.googleSearchConsoleRepository.getProperty(clientId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
     ]);
+
+    const { property_type, property_name } = property || {};
+
+    const siteUrl =
+      property_type === PropertyType.DOMAIN
+        ? `sc-domain:${property_name}`
+        : property_name;
+
+    const { data: oauth2Client, error } = currentOauth2Client;
+    if (error) {
+      throw new NotFoundException(error);
+    }
 
     const searchConsole: searchconsole_v1.Searchconsole = google.searchconsole({
       version: 'v1',
@@ -768,8 +675,15 @@ export class GoogleSearchConsoleService {
     return formattedData;
   }
 
-  async getAllProperty(clientId: string) {
-    const oauth2Client = await this.getOauth2Client(clientId);
+  async getAllProperties(clientId: string): Promise<GoogleSearchConsole[]> {
+    const { data: oauth2Client, error } =
+      await this.googleOauthService.getOauth2Client(
+        this.SERVICE_NAME,
+        clientId,
+      );
+    if (error) {
+      throw new NotFoundException(error);
+    }
 
     const searchConsole = google.searchconsole({
       version: 'v1',
@@ -782,21 +696,23 @@ export class GoogleSearchConsoleService {
       !sitesResponse.data.siteEntry ||
       sitesResponse.data.siteEntry.length === 0
     ) {
-      return [] as string[];
+      return [] as GoogleSearchConsole[];
     }
 
     const formattedProperties = sitesResponse.data.siteEntry.map((site) => {
       const { siteUrl } = site || {};
       const propertyType = siteUrl?.startsWith('sc-domain:')
-        ? 'domain'
-        : 'url_prefix';
+        ? PropertyType.DOMAIN
+        : PropertyType.URL_PREFIX;
 
       const propertyName =
-        propertyType === 'domain' ? siteUrl.replace('sc-domain:', '') : siteUrl;
+        propertyType === PropertyType.DOMAIN
+          ? siteUrl.replace('sc-domain:', '')
+          : siteUrl;
 
       return {
         property_type: propertyType,
-        property: propertyName,
+        property_name: propertyName,
       };
     });
 
