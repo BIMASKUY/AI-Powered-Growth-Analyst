@@ -6,7 +6,7 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard} from '../auth/auth.guard';
+import { AuthGuard } from '../auth/auth.guard';
 import { Auth } from '../auth/auth.decorator';
 import { AuthUser } from '../auth/auth.type';
 import { GetOverallDto } from './dto/get-overall.dto';
@@ -23,10 +23,7 @@ export class GoogleAdsController {
 
   @ApiOperation({ summary: 'Get google ads overall' })
   @Get('overall')
-  async getOverall(
-    @Auth() user: AuthUser,
-    @Query() dto: GetOverallDto,
-  ) {
+  async getOverall(@Auth() user: AuthUser, @Query() dto: GetOverallDto) {
     const data = await this.googleAdsService.getOverall(dto, user.id);
     const message = 'google ads overall fetched successfully';
     return {
@@ -37,10 +34,7 @@ export class GoogleAdsController {
 
   @ApiOperation({ summary: 'Get google ads daily' })
   @Get('daily')
-  async getDaily(
-    @Auth() user: AuthUser,
-    @Query() dto: GetDailyDto,
-  ) {
+  async getDaily(@Auth() user: AuthUser, @Query() dto: GetDailyDto) {
     const data = await this.googleAdsService.getDaily(dto, user.id);
     const message = 'google ads daily fetched successfully';
     return {
@@ -51,14 +45,8 @@ export class GoogleAdsController {
 
   @ApiOperation({ summary: 'Get google ads campaigns' })
   @Get('campaigns')
-  async getCampaigns(
-    @Auth() user: AuthUser,
-    @Query() dto: GetCampaignsDto,
-  ) {
-    const data = await this.googleAdsService.getCampaigns(
-      dto,
-      user.id
-    );
+  async getCampaigns(@Auth() user: AuthUser, @Query() dto: GetCampaignsDto) {
+    const data = await this.googleAdsService.getCampaigns(dto, user.id);
     const message = 'google ads campaigns fetched successfully';
     return {
       message,
@@ -79,11 +67,7 @@ export class GoogleAdsController {
     @Query() dto: GetCampaignByIdDto,
     @Param('id') id: string,
   ) {
-    const data = await this.googleAdsService.getCampaignById(
-      dto,
-      id,
-      user.id,
-    );
+    const data = await this.googleAdsService.getCampaignById(dto, id, user.id);
     const message = 'google ads campaign by id fetched successfully';
     return {
       message,

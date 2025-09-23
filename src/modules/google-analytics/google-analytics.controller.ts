@@ -29,14 +29,8 @@ export class GoogleAnalyticsController {
 
   @ApiOperation({ summary: 'Get google analytics overall' })
   @Get('overall')
-  async getOverall(
-    @Query() dto: GetOverallDto,
-    @Auth() user: AuthUser,
-  ) {
-    const data = await this.googleAnalyticsService.getOverall(
-      dto,
-      user.id,
-    );
+  async getOverall(@Query() dto: GetOverallDto, @Auth() user: AuthUser) {
+    const data = await this.googleAnalyticsService.getOverall(dto, user.id);
     const message = 'google analytics overall fetched successfully';
     return {
       message,
@@ -46,14 +40,8 @@ export class GoogleAnalyticsController {
 
   @ApiOperation({ summary: 'Get google analytics daily' })
   @Get('daily')
-  async getDaily(
-    @Query() dto: GetDailyDto,
-    @Auth() user: AuthUser,
-  ) {
-    const data = await this.googleAnalyticsService.getDaily(
-      dto,
-      user.id,
-    );
+  async getDaily(@Query() dto: GetDailyDto, @Auth() user: AuthUser) {
+    const data = await this.googleAnalyticsService.getDaily(dto, user.id);
     const message = 'google analytics daily fetched successfully';
     return {
       message,
@@ -63,14 +51,8 @@ export class GoogleAnalyticsController {
 
   @ApiOperation({ summary: 'Get google analytics countries' })
   @Get('countries')
-  async getCountries(
-    @Auth() user: AuthUser,
-    @Query() dto: GetCountriesDto,
-  ) {
-    const data = await this.googleAnalyticsService.getCountries(
-      dto,
-      user.id,
-    );
+  async getCountries(@Auth() user: AuthUser, @Query() dto: GetCountriesDto) {
+    const data = await this.googleAnalyticsService.getCountries(dto, user.id);
     const message = 'google analytics countries fetched successfully';
     return {
       message,
@@ -105,14 +87,8 @@ export class GoogleAnalyticsController {
 
   @ApiOperation({ summary: 'Get google analytics by pages' })
   @Get('pages')
-  async getPages(
-    @Query() dto: GetPagesDto,
-    @Auth() user: AuthUser,
-  ) {
-    const data = await this.googleAnalyticsService.getPages(
-      dto,
-      user.id,
-    );
+  async getPages(@Query() dto: GetPagesDto, @Auth() user: AuthUser) {
+    const data = await this.googleAnalyticsService.getPages(dto, user.id);
     const message = 'google analytics pages fetched successfully';
     return {
       message,

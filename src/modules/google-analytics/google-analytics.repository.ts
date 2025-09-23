@@ -12,11 +12,18 @@ export class GoogleAnalyticsRepository implements OnModuleInit {
   constructor(private readonly cosmosService: CosmosService) {}
 
   async onModuleInit() {
-    const { statusCode } = await this.cosmosService.getDatabase().containers.createIfNotExists({ id: this.containerId });
-    if (statusCode == 201) this.logger.warn(`Creating container "${this.containerId}" as it did not exist.`);
+    const { statusCode } = await this.cosmosService
+      .getDatabase()
+      .containers.createIfNotExists({ id: this.containerId });
+    if (statusCode == 201)
+      this.logger.warn(
+        `Creating container "${this.containerId}" as it did not exist.`,
+      );
     else this.logger.log('Container exists');
 
-    this.currentContainer = this.cosmosService.getDatabase().container(this.containerId);
+    this.currentContainer = this.cosmosService
+      .getDatabase()
+      .container(this.containerId);
   }
 
   async getPropertyId(userId: string) {
@@ -30,7 +37,9 @@ export class GoogleAnalyticsRepository implements OnModuleInit {
       ],
     };
 
-    const { resources } = await this.currentContainer.items.query<PlatformEntity>(querySpec).fetchAll();
+    const { resources } = await this.currentContainer.items
+      .query<PlatformEntity>(querySpec)
+      .fetchAll();
     if (resources.length === 0) return null;
 
     const resource = resources[0];

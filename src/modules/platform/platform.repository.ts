@@ -13,23 +13,31 @@ export class PlatformRepository implements OnModuleInit {
   constructor(private readonly cosmosService: CosmosService) {}
 
   async onModuleInit() {
-    const { statusCode } = await this.cosmosService.getDatabase().containers.createIfNotExists({ id: this.containerId });
-    if (statusCode == 201) this.logger.warn(`Creating container "${this.containerId}" as it did not exist.`);
+    const { statusCode } = await this.cosmosService
+      .getDatabase()
+      .containers.createIfNotExists({ id: this.containerId });
+    if (statusCode == 201)
+      this.logger.warn(
+        `Creating container "${this.containerId}" as it did not exist.`,
+      );
     else this.logger.log('Container exists');
 
-    this.currentContainer = this.cosmosService.getDatabase().container(this.containerId);
+    this.currentContainer = this.cosmosService
+      .getDatabase()
+      .container(this.containerId);
   }
 
-  async upsert(dto: UpsertDto, userId: string): Promise<any> {
+  async upsert(dto: UpsertDto, userId: string) {
     const data = {
       id: userId, // use userId as the id to ensure one-to-one relationship
       platforms: {
-        ...dto
+        ...dto,
       },
       user_id: userId,
     };
 
-    const { resource } = await this.currentContainer.items.upsert(data);
+    const { resource } =
+      await this.currentContainer.items.upsert<PlatformEntity>(data);
     const { platforms } = resource;
     const { google_analytics, google_search_console, google_ads } = platforms;
 
@@ -44,7 +52,8 @@ export class PlatformRepository implements OnModuleInit {
           property: google_search_console.property,
         },
         google_ads: {
-          manager_account_developer_token: google_ads.manager_account_developer_token,
+          manager_account_developer_token:
+            google_ads.manager_account_developer_token,
           customer_account_id: google_ads.customer_account_id,
         },
       },
@@ -54,10 +63,12 @@ export class PlatformRepository implements OnModuleInit {
 
   private formatGetByUserId(resource: PlatformEntity | null) {
     const { id, user_id, platforms } = resource || {};
-    const { google_analytics, google_search_console, google_ads } = platforms || {};
+    const { google_analytics, google_search_console, google_ads } =
+      platforms || {};
     const { property_id } = google_analytics || {};
     const { property_type, property } = google_search_console || {};
-    const { manager_account_developer_token, customer_account_id } = google_ads || {};
+    const { manager_account_developer_token, customer_account_id } =
+      google_ads || {};
 
     return {
       id: id || '',
@@ -70,7 +81,8 @@ export class PlatformRepository implements OnModuleInit {
           property: property || '',
         },
         google_ads: {
-          manager_account_developer_token: manager_account_developer_token || '',
+          manager_account_developer_token:
+            manager_account_developer_token || '',
           customer_account_id: customer_account_id || '',
         },
       },
@@ -89,11 +101,11 @@ export class PlatformRepository implements OnModuleInit {
       ],
     };
 
-    const { resources } = await this.currentContainer.items.query<PlatformEntity>(querySpec).fetchAll();
+    const { resources } = await this.currentContainer.items
+      .query<PlatformEntity>(querySpec)
+      .fetchAll();
 
-    const resource = resources.length > 0
-      ? resources[0]
-      : null;
+    const resource = resources.length > 0 ? resources[0] : null;
 
     const formattedResource = this.formatGetByUserId(resource);
     return formattedResource;

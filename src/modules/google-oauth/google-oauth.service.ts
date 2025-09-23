@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateDto } from './dto/create.dto';
 import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
@@ -39,13 +45,13 @@ export class GoogleOauthService {
       return {
         data: tokens,
         error: null,
-      }
+      };
     } catch (error) {
       this.logger.error(error.message);
       return {
         data: null,
         error: 'invalid credentials',
-      }
+      };
     }
   }
 
@@ -66,13 +72,16 @@ export class GoogleOauthService {
   // }
 
   async create(dto: CreateDto, userId: string) {
-    const googleOauthExists = await this.googleOauthRepository.getByUserId(userId);
+    const googleOauthExists =
+      await this.googleOauthRepository.getByUserId(userId);
 
     if (googleOauthExists) {
       throw new ConflictException('google oauth already exists');
     }
 
-    const { data: token, error: invalidCode } = await this.getTokenByCode(dto.code);
+    const { data: token, error: invalidCode } = await this.getTokenByCode(
+      dto.code,
+    );
     if (invalidCode) {
       throw new BadRequestException(invalidCode);
     }
@@ -87,7 +96,7 @@ export class GoogleOauthService {
 
     const { email, name, image_url } = await this.getUserInfo(googleOauth);
 
-    const arrayScope = googleOauth.scope.split(' ')
+    const arrayScope = googleOauth.scope.split(' ');
     const expiryDate = new Date(googleOauth.expiry_date);
 
     return {
@@ -98,7 +107,7 @@ export class GoogleOauthService {
       email,
       name,
       image_url,
-    }
+    };
   }
 
   private async getUserInfo(googleOauth: GoogleOauthEntity) {
@@ -161,7 +170,7 @@ export class GoogleOauthService {
       return {
         data: null,
         error: 'google oauth not found',
-      }
+      };
     }
 
     const scope = this.getScopeFromPlatform(platform);
@@ -172,7 +181,7 @@ export class GoogleOauthService {
       return {
         data: null,
         error: `${platform} scope is required on google oauth`,
-      }
+      };
     }
 
     const oauth2Client = new OAuth2Client(this.oauth2ClientSchema);
@@ -186,6 +195,6 @@ export class GoogleOauthService {
     return {
       data: oauth2Client,
       error: null,
-    }
+    };
   }
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, UseGuards, Query, Param } from '@nestjs/common';
 import { GoogleSearchConsoleService } from './google-search-console.service';
 import {
@@ -28,14 +27,8 @@ export class GoogleSearchConsoleController {
 
   @ApiOperation({ summary: 'Get google search console overall' })
   @Get('overall')
-  async getOverall(
-    @Auth() user: AuthUser,
-    @Query() dto: GetOverallDto,
-  ) {
-    const data = await this.googleSearchConsoleService.getOverall(
-      dto,
-      user.id,
-    );
+  async getOverall(@Auth() user: AuthUser, @Query() dto: GetOverallDto) {
+    const data = await this.googleSearchConsoleService.getOverall(dto, user.id);
     const message = 'google search console overall fetched successfully';
     return {
       message,
@@ -45,14 +38,8 @@ export class GoogleSearchConsoleController {
 
   @ApiOperation({ summary: 'Get google search console daily' })
   @Get('daily')
-  async getDaily(
-    @Auth() user: AuthUser,
-    @Query() dto: GetDailyDto,
-  ) {
-    const data = await this.googleSearchConsoleService.getDaily(
-      dto,
-      user.id,
-    );
+  async getDaily(@Auth() user: AuthUser, @Query() dto: GetDailyDto) {
+    const data = await this.googleSearchConsoleService.getDaily(dto, user.id);
     const message = 'google search console daily fetched successfully';
     return {
       message,
@@ -62,10 +49,7 @@ export class GoogleSearchConsoleController {
 
   @ApiOperation({ summary: 'Get google search console keywords' })
   @Get('keywords')
-  async getKeywords(
-    @Auth() user: AuthUser,
-    @Query() dto: GetKeywordsDto,
-  ) {
+  async getKeywords(@Auth() user: AuthUser, @Query() dto: GetKeywordsDto) {
     const data = await this.googleSearchConsoleService.getKeywords(
       dto,
       user.id,
@@ -104,10 +88,7 @@ export class GoogleSearchConsoleController {
 
   @ApiOperation({ summary: 'Get google search console countries' })
   @Get('countries')
-  async getCountries(
-    @Auth() user: AuthUser,
-    @Query() dto: GetCountriesDto,
-  ) {
+  async getCountries(@Auth() user: AuthUser, @Query() dto: GetCountriesDto) {
     const data = await this.googleSearchConsoleService.getCountries(
       dto,
       user.id,

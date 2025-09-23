@@ -24,10 +24,9 @@ export class GoogleAnalyticsService {
   private readonly SERVICE_NAME = Platform.GOOGLE_ANALYTICS;
 
   constructor(
-      private readonly googleOauthService: GoogleOauthService,
-      private readonly googleAnalyticsRepository: GoogleAnalyticsRepository,
-    ) {
-  }
+    private readonly googleOauthService: GoogleOauthService,
+    private readonly googleAnalyticsRepository: GoogleAnalyticsRepository,
+  ) {}
 
   private async getGoogleAnalytics(clientId: string) {
     const [propertyId, currentOauth2Client] = await Promise.all([
@@ -778,7 +777,11 @@ export class GoogleAnalyticsService {
   }
 
   async getAllPropertyIds(clientId: string) {
-    const { data: oauth2Client, error } = await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId);
+    const { data: oauth2Client, error } =
+      await this.googleOauthService.getOauth2Client(
+        this.SERVICE_NAME,
+        clientId,
+      );
     if (error) {
       throw new NotFoundException(error);
     }
@@ -797,7 +800,8 @@ export class GoogleAnalyticsService {
     });
 
     const properties = propertiesResponse.data?.properties;
-    if (!properties) return [] as { property_id: string; property_name: string }[];
+    if (!properties)
+      return [] as { property_id: string; property_name: string }[];
 
     const formattedProperties = properties.map((property) => {
       const propertyId = property.name.split('/').pop();
@@ -813,8 +817,13 @@ export class GoogleAnalyticsService {
   }
 
   async getCurrentProperty(clientId: string) {
-    const propertyId = await this.googleAnalyticsRepository.getPropertyId(clientId);
-    const { data: oauth2Client, error } = await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId);
+    const propertyId =
+      await this.googleAnalyticsRepository.getPropertyId(clientId);
+    const { data: oauth2Client, error } =
+      await this.googleOauthService.getOauth2Client(
+        this.SERVICE_NAME,
+        clientId,
+      );
     if (error) {
       throw new NotFoundException(error);
     }

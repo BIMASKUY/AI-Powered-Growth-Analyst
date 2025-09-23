@@ -7,10 +7,14 @@ import { AuthStrategy } from './auth.strategy';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [ConfigModule.forRoot(), HttpModule, JwtModule.register({
-    secret: process.env.JWT_SECRET,
-    signOptions: { expiresIn: process.env.JWT_EXPIRES_IN },
-  })],
+  imports: [
+    ConfigModule.forRoot(),
+    HttpModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN },
+    }),
+  ],
   controllers: [AuthController],
   providers: [AuthService, AuthStrategy],
   exports: [],

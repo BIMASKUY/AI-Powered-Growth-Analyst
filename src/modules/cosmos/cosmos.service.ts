@@ -9,16 +9,24 @@ export class CosmosService implements OnModuleInit {
   private readonly databaseId: string;
 
   constructor(private readonly configService: ConfigService) {
-    const endpoint = this.configService.getOrThrow<string>('COSMOS_DB_ENDPOINT');
+    const endpoint =
+      this.configService.getOrThrow<string>('COSMOS_DB_ENDPOINT');
     const key = this.configService.getOrThrow<string>('COSMOS_DB_KEY');
     this.client = new CosmosClient({ endpoint, key });
-    this.databaseId = this.configService.getOrThrow<string>('COSMOS_DB_DATABASE_ID');
+    this.databaseId = this.configService.getOrThrow<string>(
+      'COSMOS_DB_DATABASE_ID',
+    );
   }
 
   async onModuleInit() {
-    const { statusCode } = await this.client.databases.createIfNotExists({ id: this.databaseId });
-    if (statusCode == 201) this.logger.warn(`Creating database "${this.databaseId}" as it did not exist.`);
-    else this.logger.log('Database exists')
+    const { statusCode } = await this.client.databases.createIfNotExists({
+      id: this.databaseId,
+    });
+    if (statusCode == 201)
+      this.logger.warn(
+        `Creating database "${this.databaseId}" as it did not exist.`,
+      );
+    else this.logger.log('Database exists');
   }
 
   getDatabase() {

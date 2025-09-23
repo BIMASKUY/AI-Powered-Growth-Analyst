@@ -16,15 +16,12 @@ export class PlatformController {
   @ApiOperation({ summary: 'Upsert platform' })
   @Put()
   async upsert(@Auth() user: AuthUser, @Body() dto: UpsertDto) {
-    const data = await this.platformService.upsert(
-      dto,
-      user.id,
-    );
+    const data = await this.platformService.upsert(dto, user.id);
     const message = 'platform upserted successfully';
     return {
       message,
       data,
-    }
+    };
   }
 
   @ApiOperation({ summary: 'Get platform' })
@@ -35,6 +32,6 @@ export class PlatformController {
     return {
       message,
       data,
-    }
+    };
   }
 }

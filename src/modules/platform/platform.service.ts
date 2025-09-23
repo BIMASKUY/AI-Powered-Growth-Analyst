@@ -6,16 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { UpsertDto } from './dto/upsert.dto';
-import {
-  OAuth2Client,
-  OAuth2ClientOptions,
-} from 'google-auth-library';
+import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
 // import { RedisService } from '../common/service/redis.service';
 import { PlatformRepository } from './platform.repository';
 import { PlatformEntity } from './entities/platform.entity';
-import { GoogleOauthService} from '../google-oauth/google-oauth.service';
+import { GoogleOauthService } from '../google-oauth/google-oauth.service';
 import { GoogleAnalyticsService } from '../google-analytics/google-analytics.service';
 
 @Injectable()
@@ -40,7 +37,7 @@ export class PlatformService {
       clientId: this.configService.getOrThrow('GOOGLE_CLIENT_ID'),
       clientSecret: this.configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
       redirectUri,
-    }
+    };
   }
 
   private async getGoogleOauth(userId: string) {
@@ -49,12 +46,12 @@ export class PlatformService {
       return {
         data: googleOauth,
         error: null,
-      }
+      };
     } catch (error) {
       return {
         data: null,
         error: 'google oauth not found',
-      }
+      };
     }
   }
 
@@ -68,7 +65,7 @@ export class PlatformService {
     return platform;
   }
 
-  private async getGoogleAnalytics(clientId: string){
+  private async getGoogleAnalytics(clientId: string) {
     try {
       const [currentPropertyId, allPropertyIds] = await Promise.all([
         this.googleAnalyticsService.getCurrentProperty(clientId),
@@ -79,7 +76,7 @@ export class PlatformService {
         connected: true,
         current: currentPropertyId,
         options: allPropertyIds,
-      }
+      };
     } catch (error) {
       return {
         connected: false,
@@ -87,8 +84,8 @@ export class PlatformService {
           property_id: '',
           property_name: '',
         },
-        options: [] as {property_id: string; property_name: string}[],
-      }
+        options: [] as { property_id: string; property_name: string }[],
+      };
     }
   }
 
@@ -99,7 +96,7 @@ export class PlatformService {
 
     return {
       googleAnalytics,
-    }
+    };
   }
 
   async getByUserId(userId: string) {

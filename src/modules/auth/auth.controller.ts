@@ -1,9 +1,6 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import {
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
 
 @ApiTags('Auth')
@@ -13,9 +10,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'login with microsoft oauth' })
   @Post('login')
-  async login(
-    @Body() dto: LoginDto,
-  ) {
+  async login(@Body() dto: LoginDto) {
     const data = await this.authService.login(dto);
     const message = 'login successfully';
     return {

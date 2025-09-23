@@ -16,15 +16,12 @@ export class GoogleOauthController {
   @ApiOperation({ summary: 'Create google oauth token' })
   @Post()
   async create(@Auth() user: AuthUser, @Body() dto: CreateDto) {
-    const data = await this.googleOauthService.create(
-      dto,
-      user.id,
-    );
+    const data = await this.googleOauthService.create(dto, user.id);
     const message = 'google oauth token created successfully';
     return {
       message,
       data,
-    }
+    };
   }
 
   @ApiOperation({ summary: 'Get google oauth token' })
@@ -41,13 +38,11 @@ export class GoogleOauthController {
   @ApiOperation({ summary: 'Delete google oauth token' })
   @Delete()
   async delete(@Auth() user: AuthUser) {
-    const data = await this.googleOauthService.delete(
-      user.id,
-    );
+    const data = await this.googleOauthService.delete(user.id);
     const message = 'google oauth token deleted successfully';
     return {
       message,
       data,
-    }
+    };
   }
 }

@@ -7,4 +7,5 @@ export const Auth = createParamDecorator(
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authUser: AuthUser = request.user;
     return authUser;
-});
+  },
+);

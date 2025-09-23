@@ -22,9 +22,15 @@ export class AuthService {
     const env = this.configService.getOrThrow<string>('ENV');
     const isDevelopment = env === 'dev';
 
-    this.CLIENT_ID = this.configService.getOrThrow<string>('MICROSOFT_CLIENT_ID');
-    this.CLIENT_SECRET = this.configService.getOrThrow<string>('MICROSOFT_CLIENT_SECRET');
-    this.TENANT_ID = this.configService.getOrThrow<string>('MICROSOFT_TENANT_ID');
+    this.CLIENT_ID = this.configService.getOrThrow<string>(
+      'MICROSOFT_CLIENT_ID',
+    );
+    this.CLIENT_SECRET = this.configService.getOrThrow<string>(
+      'MICROSOFT_CLIENT_SECRET',
+    );
+    this.TENANT_ID = this.configService.getOrThrow<string>(
+      'MICROSOFT_TENANT_ID',
+    );
     this.REDIRECT_URI = isDevelopment
       ? this.configService.getOrThrow<string>('MICROSOFT_REDIRECT_URI_FE_DEV')
       : this.configService.getOrThrow<string>('MICROSOFT_REDIRECT_URI_FE_PROD');
@@ -48,8 +54,8 @@ export class AuthService {
           tokenParams.toString(),
           {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          }
-        )
+          },
+        ),
       );
 
       this.logger.log('Access token obtained successfully');
@@ -57,7 +63,7 @@ export class AuthService {
       return {
         data: data.access_token,
         error: null,
-      }
+      };
     } catch (error) {
       const errorMessage = error.response.data?.error_description as string;
       this.logger.error(errorMessage);
@@ -65,7 +71,7 @@ export class AuthService {
       return {
         data: null,
         error: 'invalid credentials',
-      }
+      };
     }
   }
 
@@ -76,15 +82,14 @@ export class AuthService {
           'https://graph.microsoft.com/v1.0/me',
           {
             headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        )
+          },
+        ),
       );
-
 
       return {
         data: data.id,
         error: null,
-      }
+      };
     } catch (error) {
       const errorMessage = error.response.data?.error.message as string;
       this.logger.error(errorMessage);
@@ -92,21 +97,23 @@ export class AuthService {
       return {
         data: null,
         error: 'invalid access token',
-      }
+      };
     }
   }
 
-  private  generateJwtToken(userId: string) {
+  private generateJwtToken(userId: string) {
     const payload = { id: userId };
     const token = this.jwtService.sign(payload);
     return token;
-  };
+  }
 
   async login(dto: LoginDto) {
-    const { data: accessToken, error: invalidCode } = await this.getAccessTokenByCode(dto.code);
+    const { data: accessToken, error: invalidCode } =
+      await this.getAccessTokenByCode(dto.code);
     if (invalidCode) throw new BadRequestException(invalidCode);
 
-    const { data: userId, error: invalidToken } = await this.getUserId(accessToken);
+    const { data: userId, error: invalidToken } =
+      await this.getUserId(accessToken);
     if (invalidToken) throw new BadRequestException(invalidToken);
 
     const jwtToken = this.generateJwtToken(userId);
@@ -114,6 +121,6 @@ export class AuthService {
     return {
       user_id: userId,
       token: jwtToken,
-    }
+    };
   }
 }

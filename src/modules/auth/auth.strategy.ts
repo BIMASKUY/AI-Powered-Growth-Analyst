@@ -8,7 +8,8 @@ import { Payload } from './auth.type';
 export class AuthStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(AuthStrategy.name);
 
-  constructor(configService: ConfigService) { // not use "private readonly xxx" because it's not stored in class property
+  constructor(configService: ConfigService) {
+    // not use "private readonly xxx" because it's not stored in class property
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -16,10 +17,10 @@ export class AuthStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: Payload) {
+  validate(payload: Payload) {
     this.logger.log(`current user id: ${payload.id}`);
     return {
-      id: payload.id
+      id: payload.id,
     };
   }
 }

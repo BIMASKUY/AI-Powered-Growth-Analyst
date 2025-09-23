@@ -1,4 +1,4 @@
-import { AvailablePlatform} from './available-platform.entity';
+import { AvailablePlatform } from './available-platform.entity';
 
 export class PlatformEntity {
   id: string;
