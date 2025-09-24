@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -12,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { google, searchconsole_v1 } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
-import { roundNumber } from 'src/utils/global.utils';
+import { getToday, roundNumber } from 'src/utils/global.utils';
 import ISO from 'iso-3166-1';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
@@ -52,8 +50,10 @@ export class GoogleSearchConsoleService {
     }
 
     const { property_type, property_name } = property || {};
-    if (!property_type || !property_name) {
-      throw new NotFoundException('google search console property are required');
+    if (property_type === PropertyType.NOT_SET || !property_name) {
+      throw new NotFoundException(
+        'google search console property are required',
+      );
     }
 
     const siteUrl =
@@ -721,5 +721,23 @@ export class GoogleSearchConsoleService {
     });
 
     return formattedProperties;
+  }
+
+  async isConnected(clientId: string): Promise<boolean> {
+    try {
+      const today = getToday();
+      await this.getOverall(
+        {
+          start_date: today,
+          end_date: today,
+        },
+        clientId,
+      );
+
+      return true;
+    } catch (error) {
+      this.logger.error(error.message);
+      return false;
+    }
   }
 }

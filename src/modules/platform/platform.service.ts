@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  ConflictException,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { UpsertDto } from './dto/upsert.dto';
 // import { RedisService } from '../common/service/redis.service';
 import { PlatformRepository } from './platform.repository';
@@ -13,7 +7,6 @@ import { GoogleAnalyticsService } from '../google-analytics/google-analytics.ser
 import { GoogleAnalytics } from './platform.type';
 import { GoogleSearchConsoleService } from '../google-search-console/google-search-console.service';
 import { GoogleSearchConsoleRepository } from '../google-search-console/google-search-console.repository';
-import { GoogleAds } from './entities/google-ads.entity';
 import { GoogleSearchConsole } from './entities/google-search-console.entity';
 import { GoogleAdsRepository } from '../google-ads/google-ads.repository';
 import { GoogleAdsService } from '../google-ads/google-ads.service';
@@ -61,13 +54,14 @@ export class PlatformService {
 
   private async getGoogleAnalytics(clientId: string) {
     try {
-      const [currentProperty, allProperties] = await Promise.all([
+      const [currentProperty, allProperties, isConnect] = await Promise.all([
         this.googleAnalyticsService.getCurrentProperty(clientId),
         this.googleAnalyticsService.getAllProperties(clientId),
+        this.googleAnalyticsService.isConnected(clientId),
       ]);
 
       return {
-        connected: true,
+        connected: isConnect,
         current: currentProperty,
         options: allProperties,
       };
@@ -86,18 +80,19 @@ export class PlatformService {
 
   private async getGoogleSearchConsole(clientId: string) {
     try {
-      const [currentProperty, allProperties] = await Promise.all([
+      const [currentProperty, allProperties, isConnect] = await Promise.all([
         this.googleSearchConsoleRepository.getProperty(clientId),
         this.googleSearchConsoleService.getAllProperties(clientId),
+        this.googleSearchConsoleService.isConnected(clientId),
       ]);
 
       return {
-        connected: true,
+        connected: isConnect,
         current: currentProperty,
         options: allProperties,
       };
     } catch (error) {
-      this.logger.log(error.message);
+      this.logger.log(error);
       return {
         connected: false,
         current: {
@@ -111,16 +106,19 @@ export class PlatformService {
 
   private async getGoogleAds(clientId: string) {
     try {
-      const currentAccount = await this.googleAdsRepository.getAccount(clientId);
-      const allAccounts = await this.googleAdsService.getAllAccountIds(clientId);
+      const [currentAccount, allAccounts, isConnect] = await Promise.all([
+        this.googleAdsRepository.getAccount(clientId),
+        this.googleAdsService.getAllAccountIds(clientId),
+        this.googleAdsService.isConnected(clientId),
+      ]);
 
       return {
-        connected: true,
+        connected: isConnect,
         current: currentAccount,
         options: allAccounts,
       };
     } catch (error) {
-      this.logger.log(error.message);
+      this.logger.log(error);
       return {
         connected: false,
         current: {
@@ -133,11 +131,13 @@ export class PlatformService {
   }
 
   private async getConnectedPlatforms(userId: string) {
-    const [googleAnalytics, googleSearchConsole, googleAds] = await Promise.all([
-      this.getGoogleAnalytics(userId),
-      this.getGoogleSearchConsole(userId),
-      this.getGoogleAds(userId),
-    ]);
+    const [googleAnalytics, googleSearchConsole, googleAds] = await Promise.all(
+      [
+        this.getGoogleAnalytics(userId),
+        this.getGoogleSearchConsole(userId),
+        this.getGoogleAds(userId),
+      ],
+    );
 
     return {
       googleAnalytics,
@@ -152,7 +152,8 @@ export class PlatformService {
       throw new NotFoundException(googleOauthNotFound);
     }
 
-    const { googleAnalytics, googleSearchConsole, googleAds } = await this.getConnectedPlatforms(userId);
+    const { googleAnalytics, googleSearchConsole, googleAds } =
+      await this.getConnectedPlatforms(userId);
 
     return {
       google_analytics: googleAnalytics,

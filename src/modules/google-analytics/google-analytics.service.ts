@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { analyticsdata_v1beta, google } from 'googleapis';
 import { GetOverallDto } from './dto/get-overall.dto';
-import { formatDate, roundNumber } from 'src/utils/global.utils';
+import { formatDate, getToday, roundNumber } from 'src/utils/global.utils';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetPagesDto } from './dto/get-pages.dto';
 import { GetByPageDto } from './dto/get-by-page.dto';
@@ -828,7 +828,10 @@ export class GoogleAnalyticsService {
     }
 
     if (!propertyId) {
-      throw new NotFoundException('google analytics property_id is required');
+      return {
+        property_id: '',
+        property_name: '',
+      };
     }
 
     const analyticsAdmin = google.analyticsadmin({
@@ -844,5 +847,23 @@ export class GoogleAnalyticsService {
       property_id: propertyId,
       property_name: property.displayName,
     };
+  }
+
+  async isConnected(clientId: string) {
+    try {
+      const today = getToday();
+      await this.getOverall(
+        {
+          start_date: today,
+          end_date: today,
+        },
+        clientId,
+      );
+
+      return true;
+    } catch (error) {
+      this.logger.error(error);
+      return false;
+    }
   }
 }

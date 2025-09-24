@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleAdsApi, enums, Customer, services } from 'google-ads-api';
-import { roundNumber } from 'src/utils/global.utils';
+import { getToday, roundNumber } from 'src/utils/global.utils';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';
@@ -30,7 +30,9 @@ export class GoogleAdsService {
     const account = await this.googleAdsRepository.getAccount(clientId);
     const { manager_account_developer_token } = account || {};
     if (!manager_account_developer_token) {
-      throw new NotFoundException('manager account developer token is required');
+      throw new NotFoundException(
+        'manager account developer token is required',
+      );
     }
 
     const googleAdsClient = new GoogleAdsApi({
@@ -43,7 +45,7 @@ export class GoogleAdsService {
   }
 
   private async getCustomer(clientId: string) {
-    const [ googleAdsClient, account, currentOauth2Client ] = await Promise.all([
+    const [googleAdsClient, account, currentOauth2Client] = await Promise.all([
       this.getGoogleAdsClient(clientId),
       this.googleAdsRepository.getAccount(clientId),
       this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
@@ -400,7 +402,27 @@ export class GoogleAdsService {
     const { data: oauth2Client, error } = googleOauth;
     if (error) return [] as string[];
 
-    const customerIds = await googleAdsClient.listAccessibleCustomers(oauth2Client.credentials.refresh_token);
+    const customerIds = await googleAdsClient.listAccessibleCustomers(
+      oauth2Client.credentials.refresh_token,
+    );
     return customerIds.resource_names.map((name: string) => name.split('/')[1]);
+  }
+
+  async isConnected(clientId: string): Promise<boolean> {
+    try {
+      const today = getToday();
+      await this.getOverall(
+        {
+          start_date: today,
+          end_date: today,
+        },
+        clientId,
+      );
+
+      return true;
+    } catch (error) {
+      this.logger.error(error);
+      return false;
+    }
   }
 }

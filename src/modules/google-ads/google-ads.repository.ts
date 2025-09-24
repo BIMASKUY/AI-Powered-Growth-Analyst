@@ -45,8 +45,9 @@ export class GoogleAdsRepository implements OnModuleInit {
     const resource = resources[0];
 
     return {
-      manager_account_developer_token: resource.platforms.google_ads.manager_account_developer_token,
-      customer_account_id:resource.platforms.google_ads.customer_account_id,
-    }
+      manager_account_developer_token:
+        resource.platforms.google_ads.manager_account_developer_token,
+      customer_account_id: resource.platforms.google_ads.customer_account_id,
+    };
   }
 }

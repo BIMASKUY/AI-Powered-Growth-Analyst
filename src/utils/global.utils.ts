@@ -18,3 +18,9 @@ export function formatDate(date: string): string {
   const formattedDate = format(parsedDate, 'yyyy-MM-dd');
   return formattedDate;
 }
+
+export function getToday() {
+  const today = new Date();
+  const formattedToday = format(today, 'yyyy-MM-dd');
+  return formattedToday;
+}
