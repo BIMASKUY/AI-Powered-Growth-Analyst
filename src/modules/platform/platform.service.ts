@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { UpsertDto } from './dto/upsert.dto';
-import { google } from 'googleapis';
 // import { RedisService } from '../common/service/redis.service';
 import { PlatformRepository } from './platform.repository';
 import { GoogleOauthService } from '../google-oauth/google-oauth.service';
@@ -14,6 +13,10 @@ import { GoogleAnalyticsService } from '../google-analytics/google-analytics.ser
 import { GoogleAnalytics } from './platform.type';
 import { GoogleSearchConsoleService } from '../google-search-console/google-search-console.service';
 import { GoogleSearchConsoleRepository } from '../google-search-console/google-search-console.repository';
+import { GoogleAds } from './entities/google-ads.entity';
+import { GoogleSearchConsole } from './entities/google-search-console.entity';
+import { GoogleAdsRepository } from '../google-ads/google-ads.repository';
+import { GoogleAdsService } from '../google-ads/google-ads.service';
 
 @Injectable()
 export class PlatformService {
@@ -26,6 +29,8 @@ export class PlatformService {
     private readonly googleAnalyticsService: GoogleAnalyticsService,
     private readonly googleSearchConsoleService: GoogleSearchConsoleService,
     private readonly googleSearchConsoleRepository: GoogleSearchConsoleRepository,
+    private readonly googleAdsRepository: GoogleAdsRepository,
+    private readonly googleAdsService: GoogleAdsService,
   ) {}
 
   private async getGoogleOauth(userId: string) {
@@ -99,20 +104,45 @@ export class PlatformService {
           property_type: '',
           property_name: '',
         },
-        options: [] as GoogleSearchConsoleService[],
+        options: [] as GoogleSearchConsole[],
+      };
+    }
+  }
+
+  private async getGoogleAds(clientId: string) {
+    try {
+      const currentAccount = await this.googleAdsRepository.getAccount(clientId);
+      const allAccounts = await this.googleAdsService.getAllAccountIds(clientId);
+
+      return {
+        connected: true,
+        current: currentAccount,
+        options: allAccounts,
+      };
+    } catch (error) {
+      this.logger.log(error.message);
+      return {
+        connected: false,
+        current: {
+          customer_account_id: '',
+          manager_account_developer_token: '',
+        },
+        options: [] as string[],
       };
     }
   }
 
   private async getConnectedPlatforms(userId: string) {
-    const [googleAnalytics, googleSearchConsole] = await Promise.all([
+    const [googleAnalytics, googleSearchConsole, googleAds] = await Promise.all([
       this.getGoogleAnalytics(userId),
       this.getGoogleSearchConsole(userId),
+      this.getGoogleAds(userId),
     ]);
 
     return {
       googleAnalytics,
       googleSearchConsole,
+      googleAds,
     };
   }
 
@@ -122,13 +152,12 @@ export class PlatformService {
       throw new NotFoundException(googleOauthNotFound);
     }
 
-    const platform = await this.platformRepository.getByUserId(userId);
-
-    const { googleAnalytics, googleSearchConsole } = await this.getConnectedPlatforms(userId);
+    const { googleAnalytics, googleSearchConsole, googleAds } = await this.getConnectedPlatforms(userId);
 
     return {
       google_analytics: googleAnalytics,
       google_search_console: googleSearchConsole,
+      google_ads: googleAds,
     };
   }
 }

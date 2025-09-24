@@ -46,17 +46,20 @@ export class GoogleSearchConsoleService {
       this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
     ]);
 
+    const { data: oauth2Client, error } = currentOauth2Client;
+    if (error) {
+      throw new NotFoundException(error);
+    }
+
     const { property_type, property_name } = property || {};
+    if (!property_type || !property_name) {
+      throw new NotFoundException('google search console property are required');
+    }
 
     const siteUrl =
       property_type === PropertyType.DOMAIN
         ? `sc-domain:${property_name}`
         : property_name;
-
-    const { data: oauth2Client, error } = currentOauth2Client;
-    if (error) {
-      throw new NotFoundException(error);
-    }
 
     const searchConsole: searchconsole_v1.Searchconsole = google.searchconsole({
       version: 'v1',
@@ -681,6 +684,7 @@ export class GoogleSearchConsoleService {
         this.SERVICE_NAME,
         clientId,
       );
+
     if (error) {
       throw new NotFoundException(error);
     }

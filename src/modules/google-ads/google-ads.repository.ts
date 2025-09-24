@@ -2,12 +2,11 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { CosmosService } from '../cosmos/cosmos.service';
 import { Container } from '@azure/cosmos';
 import { PlatformEntity } from '../platform/entities/platform.entity';
-import { GoogleSearchConsole } from '../platform/entities/google-search-console.entity';
 
 @Injectable()
-export class GoogleSearchConsoleRepository implements OnModuleInit {
+export class GoogleAdsRepository implements OnModuleInit {
   private readonly containerId = 'platform';
-  private readonly logger = new Logger(GoogleSearchConsoleRepository.name);
+  private readonly logger = new Logger(GoogleAdsRepository.name);
   private currentContainer: Container;
 
   constructor(private readonly cosmosService: CosmosService) {}
@@ -27,7 +26,7 @@ export class GoogleSearchConsoleRepository implements OnModuleInit {
       .container(this.containerId);
   }
 
-  async getProperty(userId: string): Promise<GoogleSearchConsole | null> {
+  async getAccount(userId: string) {
     const querySpec = {
       query: 'SELECT TOP 1 * FROM c WHERE c.user_id = @userId',
       parameters: [
@@ -44,9 +43,10 @@ export class GoogleSearchConsoleRepository implements OnModuleInit {
     if (resources.length === 0) return null;
 
     const resource = resources[0];
+
     return {
-      property_type: resource.platforms.google_search_console.property_type,
-      property_name: resource.platforms.google_search_console.property_name,
-    };
+      manager_account_developer_token: resource.platforms.google_ads.manager_account_developer_token,
+      customer_account_id:resource.platforms.google_ads.customer_account_id,
+    }
   }
 }

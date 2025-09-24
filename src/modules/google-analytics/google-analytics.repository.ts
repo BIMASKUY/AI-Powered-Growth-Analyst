@@ -26,7 +26,7 @@ export class GoogleAnalyticsRepository implements OnModuleInit {
       .container(this.containerId);
   }
 
-  async getPropertyId(userId: string) {
+  async getPropertyId(userId: string): Promise<string | null> {
     const querySpec = {
       query: 'SELECT TOP 1 * FROM c WHERE c.user_id = @userId',
       parameters: [

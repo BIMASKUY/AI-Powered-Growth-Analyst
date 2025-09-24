@@ -34,13 +34,13 @@ export class GoogleAnalyticsService {
       this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
     ]);
 
-    if (!propertyId) {
-      throw new NotFoundException('google analytics property_id is required');
-    }
-
     const { data: oauth2Client, error } = currentOauth2Client;
     if (error) {
       throw new NotFoundException(error);
+    }
+
+    if (!propertyId) {
+      throw new NotFoundException('google analytics property_id is required');
     }
 
     const analytics: analyticsdata_v1beta.Analyticsdata = google.analyticsdata({
@@ -825,6 +825,10 @@ export class GoogleAnalyticsService {
     const { data: oauth2Client, error } = currentOauth2Client;
     if (error) {
       throw new NotFoundException(error);
+    }
+
+    if (!propertyId) {
+      throw new NotFoundException('google analytics property_id is required');
     }
 
     const analyticsAdmin = google.analyticsadmin({

@@ -1,4 +1,4 @@
-import { Injectable, HttpException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleAdsApi, enums, Customer, services } from 'google-ads-api';
 import { roundNumber } from 'src/utils/global.utils';
@@ -8,6 +8,7 @@ import { GetCampaignsDto } from './dto/get-campaigns.dto';
 import { GetCampaignByIdDto } from './dto/get-campaign-by-id.dto';
 import { GoogleOauthService } from '../google-oauth/google-oauth.service';
 import { Platform } from '../google-oauth/google-oauth.enum';
+import { GoogleAdsRepository } from './google-ads.repository';
 
 @Injectable()
 export class GoogleAdsService {
@@ -15,33 +16,22 @@ export class GoogleAdsService {
   private readonly SERVICE_NAME = Platform.GOOGLE_ADS;
   private readonly clientId: string;
   private readonly clientSecret: string;
-  private readonly customerAccountId: string;
-  private readonly managerAccountDeveloperToken: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly googleOauthService: GoogleOauthService,
+    private readonly googleAdsRepository: GoogleAdsRepository,
   ) {
     this.clientId = this.configService.getOrThrow('GOOGLE_CLIENT_ID');
     this.clientSecret = this.configService.getOrThrow('GOOGLE_CLIENT_SECRET');
-
-    this.customerAccountId = this.configService.getOrThrow(
-      'TESTING_ADS_CUSTOMER_ACCOUNT_ID',
-    );
-    this.managerAccountDeveloperToken = this.configService.getOrThrow(
-      'TESTING_ADS_MANAGER_ACCOUNT_DEVELOPER_TOKEN',
-    );
   }
 
-  private async getGoogleAdsClient(clientId: string): Promise<{
-    googleAdsClient: GoogleAdsApi;
-    customer_account_id: string;
-  }> {
-    // Implement fetch database to get manager_account_developer_token
-
-    // TESTING PURPOSE
-    const customer_account_id = this.customerAccountId;
-    const manager_account_developer_token = this.managerAccountDeveloperToken;
+  private async getGoogleAdsClient(clientId: string) {
+    const account = await this.googleAdsRepository.getAccount(clientId);
+    const { manager_account_developer_token } = account || {};
+    if (!manager_account_developer_token) {
+      throw new NotFoundException('manager account developer token is required');
+    }
 
     const googleAdsClient = new GoogleAdsApi({
       client_id: this.clientId,
@@ -49,29 +39,24 @@ export class GoogleAdsService {
       developer_token: manager_account_developer_token,
     });
 
-    return {
-      googleAdsClient,
-      customer_account_id,
-    };
+    return googleAdsClient;
   }
 
   private async getCustomer(clientId: string) {
-    const currentOauth2Client = await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId);
+    const [ googleAdsClient, account, currentOauth2Client ] = await Promise.all([
+      this.getGoogleAdsClient(clientId),
+      this.googleAdsRepository.getAccount(clientId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
+    ]);
+
     const { data: oauth2Client, error } = currentOauth2Client;
     if (error) {
+      this.logger.error(error);
       throw new NotFoundException(error);
     }
 
-    // const [{ googleAdsClient, customer_account_id: customerId }, refreshToken] =
-    //   await Promise.all([
-    //     this.getGoogleAdsClient(clientId),
-    //     this.getRefreshToken(clientId),
-    //   ]);
-
-    const { googleAdsClient, customer_account_id: customerId } = await this.getGoogleAdsClient(clientId)
-
     const customer: Customer = googleAdsClient.Customer({
-      customer_id: customerId,
+      customer_id: account.customer_account_id,
       refresh_token: oauth2Client.credentials.refresh_token,
     });
 
@@ -403,5 +388,19 @@ export class GoogleAdsService {
       currencyCode,
     );
     return formattedCampaign;
+  }
+
+  async getAllAccountIds(clientId: string): Promise<string[]> {
+    const googleAdsClient = await this.getGoogleAdsClient(clientId);
+    const googleOauth = await this.googleOauthService.getOauth2Client(
+      this.SERVICE_NAME,
+      clientId,
+    );
+
+    const { data: oauth2Client, error } = googleOauth;
+    if (error) return [] as string[];
+
+    const customerIds = await googleAdsClient.listAccessibleCustomers(oauth2Client.credentials.refresh_token);
+    return customerIds.resource_names.map((name: string) => name.split('/')[1]);
   }
 }
