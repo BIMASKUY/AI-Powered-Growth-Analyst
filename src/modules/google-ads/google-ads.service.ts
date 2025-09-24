@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { Injectable, HttpException, Logger } from '@nestjs/common';
+import { Injectable, HttpException, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleAdsApi, enums, Customer, services } from 'google-ads-api';
 import { roundNumber } from 'src/utils/global.utils';
@@ -8,18 +6,21 @@ import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';
 import { GetCampaignByIdDto } from './dto/get-campaign-by-id.dto';
+import { GoogleOauthService } from '../google-oauth/google-oauth.service';
+import { Platform } from '../google-oauth/google-oauth.enum';
 
 @Injectable()
 export class GoogleAdsService {
+  private readonly logger = new Logger(GoogleAdsService.name);
+  private readonly SERVICE_NAME = Platform.GOOGLE_ADS;
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly customerAccountId: string;
   private readonly managerAccountDeveloperToken: string;
-  private readonly testingRefreshToken: string;
 
   constructor(
-    // private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
+    private readonly googleOauthService: GoogleOauthService,
   ) {
     this.clientId = this.configService.getOrThrow('GOOGLE_CLIENT_ID');
     this.clientSecret = this.configService.getOrThrow('GOOGLE_CLIENT_SECRET');
@@ -30,83 +31,15 @@ export class GoogleAdsService {
     this.managerAccountDeveloperToken = this.configService.getOrThrow(
       'TESTING_ADS_MANAGER_ACCOUNT_DEVELOPER_TOKEN',
     );
-    this.testingRefreshToken = this.configService.getOrThrow(
-      'TESTING_REFRESH_TOKEN',
-    );
-  }
-
-  private async getRefreshToken(clientId: string) {
-    // const { data: googleOauth, error: googleOauthError } =
-    //   await this.supabaseService
-    //     .getClient()
-    //     .from('google_oauth')
-    //     .select('refresh_token, scope')
-    //     .eq('client_id', clientId)
-    //     .maybeSingle();
-
-    // const { refresh_token, scope } = googleOauth || {};
-
-    // if (!refresh_token || !scope) {
-    //   throw new HttpException('Google OAuth is required', 404);
-    // }
-
-    // if (googleOauthError) {
-    //   Logger.error(
-    //     'failed to get google oauth',
-    //     googleOauthError.message,
-    //     'GoogleAdsService',
-    //   );
-    //   throw new HttpException('failed to get google oauth', 500);
-    // }
-
-    // const scopeArray = scope.trim().split(' ');
-    // const isGoogleAdsScope = scopeArray.includes(
-    //   'https://www.googleapis.com/auth/adwords',
-    // );
-    // if (!isGoogleAdsScope) {
-    //   throw new HttpException(
-    //     'google ads scope is required on google oauth',
-    //     400,
-    //   );
-    // }
-
-    const refresh_token = this.testingRefreshToken;
-
-    return refresh_token;
   }
 
   private async getGoogleAdsClient(clientId: string): Promise<{
     googleAdsClient: GoogleAdsApi;
     customer_account_id: string;
   }> {
-    // const { data: googleAds, error: googleAdsError } =
-    //   await this.supabaseService
-    //     .getClient()
-    //     .from('google_ads')
-    //     .select('customer_account_id, manager_account_developer_token')
-    //     .eq('client_id', clientId)
-    //     .maybeSingle();
+    // Implement fetch database to get manager_account_developer_token
 
-    // const { customer_account_id, manager_account_developer_token } =
-    //   googleAds || {};
-
-    // if (!customer_account_id || !manager_account_developer_token) {
-    //   throw new HttpException(
-    //     'google ads customer_account_id and manager_account_developer_token are required',
-    //     404,
-    //   );
-    // }
-
-    // if (googleAdsError) {
-    //   Logger.error(
-    //     'error fetch google ads',
-    //     googleAdsError.message,
-    //     'GoogleAdsService',
-    //   );
-    //   throw new HttpException('failed to get google ads', 500);
-    // }
-
-    // testing purpose
+    // TESTING PURPOSE
     const customer_account_id = this.customerAccountId;
     const manager_account_developer_token = this.managerAccountDeveloperToken;
 
@@ -123,15 +56,23 @@ export class GoogleAdsService {
   }
 
   private async getCustomer(clientId: string) {
-    const [{ googleAdsClient, customer_account_id: customerId }, refreshToken] =
-      await Promise.all([
-        this.getGoogleAdsClient(clientId),
-        this.getRefreshToken(clientId),
-      ]);
+    const currentOauth2Client = await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId);
+    const { data: oauth2Client, error } = currentOauth2Client;
+    if (error) {
+      throw new NotFoundException(error);
+    }
+
+    // const [{ googleAdsClient, customer_account_id: customerId }, refreshToken] =
+    //   await Promise.all([
+    //     this.getGoogleAdsClient(clientId),
+    //     this.getRefreshToken(clientId),
+    //   ]);
+
+    const { googleAdsClient, customer_account_id: customerId } = await this.getGoogleAdsClient(clientId)
 
     const customer: Customer = googleAdsClient.Customer({
       customer_id: customerId,
-      refresh_token: refreshToken,
+      refresh_token: oauth2Client.credentials.refresh_token,
     });
 
     return customer;
