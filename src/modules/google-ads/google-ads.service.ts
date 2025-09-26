@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleAdsApi, enums, Customer, services } from 'google-ads-api';
-import { getToday, roundNumber } from 'src/utils/global.utils';
+import { getToday, roundNumber } from 'src/global/global.utils';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetCampaignsDto } from './dto/get-campaigns.dto';

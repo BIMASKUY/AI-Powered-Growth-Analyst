@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { google, searchconsole_v1 } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
-import { getToday, roundNumber } from 'src/utils/global.utils';
+import { getToday, roundNumber } from 'src/global/global.utils';
 import ISO from 'iso-3166-1';
 import { GetOverallDto } from './dto/get-overall.dto';
 import { GetDailyDto } from './dto/get-daily.dto';

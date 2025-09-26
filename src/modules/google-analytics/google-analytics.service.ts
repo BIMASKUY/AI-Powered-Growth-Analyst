@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { analyticsdata_v1beta, google } from 'googleapis';
 import { GetOverallDto } from './dto/get-overall.dto';
-import { formatDate, getToday, roundNumber } from 'src/utils/global.utils';
+import { formatDate, getToday, roundNumber } from 'src/global/global.utils';
 import { GetDailyDto } from './dto/get-daily.dto';
 import { GetPagesDto } from './dto/get-pages.dto';
 import { GetByPageDto } from './dto/get-by-page.dto';
