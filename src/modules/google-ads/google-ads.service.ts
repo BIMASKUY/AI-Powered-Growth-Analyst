@@ -18,7 +18,7 @@ import { Method } from './google-ads.enum';
 export class GoogleAdsService {
   private readonly logger = new Logger(GoogleAdsService.name);
   private readonly SERVICE_NAME = Platform.GOOGLE_ADS;
-  private readonly userId: string;
+  private readonly clientId: string;
   private readonly clientSecret: string;
 
   constructor(
@@ -27,7 +27,7 @@ export class GoogleAdsService {
     private readonly googleAdsRepository: GoogleAdsRepository,
     private readonly redisService: RedisService,
   ) {
-    this.userId = this.configService.getOrThrow('GOOGLE_CLIENT_ID');
+    this.clientId = this.configService.getOrThrow('GOOGLE_CLIENT_ID');
     this.clientSecret = this.configService.getOrThrow('GOOGLE_CLIENT_SECRET');
   }
 
@@ -41,7 +41,7 @@ export class GoogleAdsService {
     }
 
     const googleAdsClient = new GoogleAdsApi({
-      client_id: this.userId,
+      client_id: this.clientId,
       client_secret: this.clientSecret,
       developer_token: manager_account_developer_token,
     });
