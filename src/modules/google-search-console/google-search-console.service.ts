@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   Logger,
@@ -9,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { google, searchconsole_v1 } from 'googleapis';
-import { ConfigService } from '@nestjs/config';
 import { getToday, roundNumber } from 'src/global/global.utils';
 import ISO from 'iso-3166-1';
 import { GetOverallDto } from './dto/get-overall.dto';
@@ -24,7 +20,15 @@ import { Platform } from '../google-oauth/google-oauth.enum';
 import { GoogleSearchConsoleRepository } from './google-search-console.repository';
 import { PropertyType } from '../platform/platform.enum';
 import { GoogleSearchConsole } from '../platform/entities/google-search-console.entity';
-// import { RedisService } from '../common/service/redis.service';
+import { RedisService } from '../redis/redis.service';
+import { Method } from './google-search-console.enum';
+import { AdvancedServiceKey, ServiceKey } from '../redis/redis.type';
+import {
+  BaseMetrics,
+  CountryMetrics,
+  DailyMetrics,
+  KeywordMetrics,
+} from './google-search-console.type';
 
 @Injectable()
 export class GoogleSearchConsoleService {
@@ -32,16 +36,15 @@ export class GoogleSearchConsoleService {
   private readonly logger = new Logger(GoogleSearchConsoleService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly googleOauthService: GoogleOauthService,
     private readonly googleSearchConsoleRepository: GoogleSearchConsoleRepository,
-    // private readonly redisService: RedisService,
+    private readonly redisService: RedisService,
   ) {}
 
-  private async getGoogleSearchConsole(clientId: string) {
+  private async getGoogleSearchConsole(userId: string) {
     const [property, currentOauth2Client] = await Promise.all([
-      this.googleSearchConsoleRepository.getProperty(clientId),
-      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
+      this.googleSearchConsoleRepository.getProperty(userId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, userId),
     ]);
 
     const { data: oauth2Client, error } = currentOauth2Client;
@@ -115,6 +118,36 @@ export class GoogleSearchConsoleService {
     return null;
   }
 
+  private getKeyCache(
+    dto: GetOverallDto,
+    method: Method,
+    userId: string,
+  ): ServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+    };
+  }
+
+  private getAdvancedKeyCache(
+    dto: GetKeywordsDto,
+    method: Method,
+    userId: string,
+  ): AdvancedServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+      limit: dto.limit,
+      search: dto.search,
+    };
+  }
+
   private async fetchGetOverall(
     searchConsole: searchconsole_v1.Searchconsole,
     siteUrl: string,
@@ -131,14 +164,14 @@ export class GoogleSearchConsoleService {
       });
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new ForbiddenException(error.message);
+      this.logger.error(error);
+      throw new ForbiddenException(error);
     }
   }
 
   private formatGetOverall(
     rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  ) {
+  ): BaseMetrics {
     const metricValues = rawData.rows[0];
     return {
       clicks: metricValues.clicks,
@@ -149,20 +182,14 @@ export class GoogleSearchConsoleService {
   }
 
   // already organic traffic (it's for all endpoint that use search console)
-  async getOverall(dto: GetOverallDto, clientId: string) {
-    // Check cache first
-    // const cachedData = await this.redisService.get(
-    //   clientId,
-    //   this.SERVICE_NAME,
-    //   'get-overall',
-    //   query.start_date,
-    //   query.end_date,
-    //   withAnalysis,
-    // );
-    // if (cachedData) return cachedData as GetOverall;
+  async getOverall(dto: GetOverallDto, userId: string): Promise<BaseMetrics> {
+    // get cache
+    const keyCache = this.getKeyCache(dto, Method.GET_OVERALL, userId);
+    const cache = await this.redisService.getService<BaseMetrics>(keyCache);
+    if (cache) return cache;
 
     const { searchConsole, siteUrl } =
-      await this.getGoogleSearchConsole(clientId);
+      await this.getGoogleSearchConsole(userId);
 
     const rawData = await this.fetchGetOverall(
       searchConsole,
@@ -171,26 +198,14 @@ export class GoogleSearchConsoleService {
       dto.end_date,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData.rows?.[0];
-    if (!hasData) return {};
+    if (!hasData) return {} as BaseMetrics;
 
     const formattedData = this.formatGetOverall(rawData);
 
-    // Save cache to redis
-    // await this.redisService.add(
-    //   {
-    //     clientId,
-    //     service: this.SERVICE_NAME,
-    //     method: 'get-overall',
-    //     startDate: query.start_date,
-    //     endDate: query.end_date,
-    //     withAnalysis,
-    //   },
-    //   {
-    //     data: overallFormattedData,
-    //   },
-    // );
+    // create cache
+    await this.redisService.createService<BaseMetrics>(keyCache, formattedData);
 
     return formattedData;
   }
@@ -213,14 +228,14 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new ForbiddenException(error.message);
+      this.logger.error(error);
+      throw new ForbiddenException(error);
     }
   }
 
   private formatGetDaily(
     rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  ) {
+  ): DailyMetrics[] {
     const allFormattedData = rawData.rows.map((item) => ({
       date: item.keys[0],
       clicks: item.clicks,
@@ -232,23 +247,14 @@ export class GoogleSearchConsoleService {
     return allFormattedData;
   }
 
-  async getDaily(dto: GetDailyDto, clientId: string) {
-    // Check cache first
-    // const cachedData = await this.redisService.get(
-    //   clientId,
-    //   this.SERVICE_NAME,
-    //   'get-daily',
-    //   query.start_date,
-    //   query.end_date,
-    //   true,
-    //   query.order_by,
-    //   query.limit,
-    //   query.page,
-    // );
-    // if (cachedData) return cachedData as GetDaily;
+  async getDaily(dto: GetDailyDto, userId: string): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getKeyCache(dto, Method.GET_DAILY, userId);
+    const cache = await this.redisService.getService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
 
     const { searchConsole, siteUrl } =
-      await this.getGoogleSearchConsole(clientId);
+      await this.getGoogleSearchConsole(userId);
 
     const rawData = await this.fetchGetDaily(
       searchConsole,
@@ -257,30 +263,17 @@ export class GoogleSearchConsoleService {
       dto.end_date,
     );
 
+    // case when data not found
     const hasData = rawData?.rows?.length > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetDaily(rawData);
 
-    // Save cache to redis
-    // await this.redisService.add(
-    //   {
-    //     clientId,
-    //     service: this.SERVICE_NAME,
-    //     method: 'get-daily',
-    //     startDate: query.start_date,
-    //     endDate: query.end_date,
-    //     withAnalysis: true,
-    //     orderBy: query.order_by,
-    //     limit: query.limit,
-    //     page: query.page,
-    //   },
-    //   {
-    //     pagination: paginationInfo,
-    //     analysis,
-    //     data: paginationFormattedData,
-    //   },
-    // );
+    // create cache
+    await this.redisService.createService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -317,14 +310,14 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new ForbiddenException(error.message);
+      this.logger.error(error);
+      throw new ForbiddenException(error);
     }
   }
 
   private formatGetKeywords(
     rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  ) {
+  ): KeywordMetrics[] {
     const { rows } = rawData;
 
     const allFormattedData = rows
@@ -340,23 +333,18 @@ export class GoogleSearchConsoleService {
     return allFormattedData;
   }
 
-  async getKeywords(dto: GetKeywordsDto, clientId: string) {
-    // Check cache first (the cache is only for query without search)
-    // const cachedData = await this.redisService.get(
-    //   clientId,
-    //   this.SERVICE_NAME,
-    //   'get-keywords',
-    //   query.start_date,
-    //   query.end_date,
-    //   true,
-    //   query.order_by,
-    //   query.limit,
-    //   query.page,
-    // );
-    // if (cachedData) return cachedData as GetKeywords;
+  async getKeywords(
+    dto: GetKeywordsDto,
+    userId: string,
+  ): Promise<KeywordMetrics[]> {
+    // get cache
+    const keyCache = this.getAdvancedKeyCache(dto, Method.GET_KEYWORDS, userId);
+    const cache =
+      await this.redisService.getAdvancedService<KeywordMetrics[]>(keyCache);
+    if (cache) return cache;
 
     const { searchConsole, siteUrl } =
-      await this.getGoogleSearchConsole(clientId);
+      await this.getGoogleSearchConsole(userId);
 
     const rawData = await this.fetchGetKeywords(
       searchConsole,
@@ -367,32 +355,17 @@ export class GoogleSearchConsoleService {
       dto.search,
     );
 
+    // case when data not found
     const hasData = rawData?.rows?.length > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as KeywordMetrics[];
 
     const formattedData = this.formatGetKeywords(rawData);
 
-    // Save cache to redis (only for query without search)
-    // if (!query.search) {
-    //   await this.redisService.add(
-    //     {
-    //       clientId,
-    //       service: this.SERVICE_NAME,
-    //       method: 'get-keywords',
-    //       startDate: query.start_date,
-    //       endDate: query.end_date,
-    //       withAnalysis: true,
-    //       orderBy: query.order_by,
-    //       limit: query.limit,
-    //       page: query.page,
-    //     },
-    //     {
-    //       pagination: paginationInfo,
-    //       analysis,
-    //       data: paginationFormattedData,
-    //     },
-    //   );
-    // }
+    // create cache
+    await this.redisService.createAdvancedService<KeywordMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -427,14 +400,14 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new ForbiddenException(error.message);
+      this.logger.error(error);
+      throw new ForbiddenException(error);
     }
   }
 
   private formatGetByKeyword(
     rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  ) {
+  ): DailyMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows
@@ -450,9 +423,13 @@ export class GoogleSearchConsoleService {
     return formattedData;
   }
 
-  async getByKeyword(dto: GetByKeywordDto, keyword: string, clientId: string) {
+  async getByKeyword(
+    dto: GetByKeywordDto,
+    keyword: string,
+    userId: string,
+  ): Promise<DailyMetrics[]> {
     const { searchConsole, siteUrl } =
-      await this.getGoogleSearchConsole(clientId);
+      await this.getGoogleSearchConsole(userId);
 
     const rawData = await this.fetchGetByKeyword(
       searchConsole,
@@ -462,8 +439,9 @@ export class GoogleSearchConsoleService {
       keyword,
     );
 
+    // case when data not found
     const hasData = rawData?.rows?.length > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByKeyword(rawData);
 
@@ -502,8 +480,8 @@ export class GoogleSearchConsoleService {
       });
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new ForbiddenException(error.message);
+      this.logger.error(error);
+      throw new ForbiddenException(error);
     }
   }
 
@@ -511,7 +489,7 @@ export class GoogleSearchConsoleService {
     rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
     limit: number,
     search: string,
-  ) {
+  ): CountryMetrics[] {
     const { rows } = rawData;
 
     // format data first
@@ -540,23 +518,22 @@ export class GoogleSearchConsoleService {
     return limitedData;
   }
 
-  async getCountries(dto: GetCountriesDto, clientId: string) {
-    // Check cache first (the cache is only for query without search)
-    // const cachedData = await this.redisService.get(
-    //   clientId,
-    //   this.SERVICE_NAME,
-    //   'get-countries',
-    //   query.start_date,
-    //   query.end_date,
-    //   true,
-    //   query.order_by,
-    //   query.limit,
-    //   query.page,
-    // );
-    // if (cachedData) return cachedData as GetCountries;
+  async getCountries(
+    dto: GetCountriesDto,
+    userId: string,
+  ): Promise<CountryMetrics[]> {
+    // get cache
+    const keyCache = this.getAdvancedKeyCache(
+      dto,
+      Method.GET_COUNTRIES,
+      userId,
+    );
+    const cache =
+      await this.redisService.getAdvancedService<CountryMetrics[]>(keyCache);
+    if (cache) return cache;
 
     const { searchConsole, siteUrl } =
-      await this.getGoogleSearchConsole(clientId);
+      await this.getGoogleSearchConsole(userId);
 
     const rawData = await this.fetchGetCountries(
       searchConsole,
@@ -565,9 +542,9 @@ export class GoogleSearchConsoleService {
       dto.end_date,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rows?.length > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as CountryMetrics[];
 
     const formattedData = this.formatGetCountries(
       rawData,
@@ -575,27 +552,11 @@ export class GoogleSearchConsoleService {
       dto.search,
     );
 
-    // Save cache to redis (only for query without search)
-    // if (!query.search) {
-    //   await this.redisService.add(
-    //     {
-    //       clientId,
-    //       service: this.SERVICE_NAME,
-    //       method: 'get-countries',
-    //       startDate: query.start_date,
-    //       endDate: query.end_date,
-    //       withAnalysis: true,
-    //       orderBy: query.order_by,
-    //       limit: query.limit,
-    //       page: query.page,
-    //     },
-    //     {
-    //       pagination: paginationInfo,
-    //       analysis,
-    //       data: paginationFormattedData,
-    //     },
-    //   );
-    // }
+    // create cache
+    await this.redisService.createAdvancedService<CountryMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -629,14 +590,14 @@ export class GoogleSearchConsoleService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new ForbiddenException(error.message);
+      this.logger.error(error);
+      throw new ForbiddenException(error);
     }
   }
 
   private formatGetByCountry(
     rawData: searchconsole_v1.Schema$SearchAnalyticsQueryResponse,
-  ) {
+  ): DailyMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows
@@ -652,9 +613,13 @@ export class GoogleSearchConsoleService {
     return formattedData;
   }
 
-  async getByCountry(dto: GetByCountryDto, country: string, clientId: string) {
+  async getByCountry(
+    dto: GetByCountryDto,
+    country: string,
+    userId: string,
+  ): Promise<DailyMetrics[]> {
     const { searchConsole, siteUrl } =
-      await this.getGoogleSearchConsole(clientId);
+      await this.getGoogleSearchConsole(userId);
 
     const countryCode: string | null = this.getCountryCode(country);
     if (!countryCode) {
@@ -669,21 +634,18 @@ export class GoogleSearchConsoleService {
       countryCode,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rows?.length > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByCountry(rawData);
 
     return formattedData;
   }
 
-  async getAllProperties(clientId: string): Promise<GoogleSearchConsole[]> {
+  async getAllProperties(userId: string): Promise<GoogleSearchConsole[]> {
     const { data: oauth2Client, error } =
-      await this.googleOauthService.getOauth2Client(
-        this.SERVICE_NAME,
-        clientId,
-      );
+      await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, userId);
 
     if (error) {
       throw new NotFoundException(error);
@@ -723,7 +685,7 @@ export class GoogleSearchConsoleService {
     return formattedProperties;
   }
 
-  async isConnected(clientId: string): Promise<boolean> {
+  async isConnected(userId: string): Promise<boolean> {
     try {
       const today = getToday();
       await this.getOverall(
@@ -731,12 +693,12 @@ export class GoogleSearchConsoleService {
           start_date: today,
           end_date: today,
         },
-        clientId,
+        userId,
       );
 
       return true;
     } catch (error) {
-      this.logger.error(error.message);
+      this.logger.error(error);
       return false;
     }
   }

@@ -95,12 +95,13 @@ export class RedisRepository implements OnModuleInit, OnModuleDestroy {
 
   async create(key: string, value: string): Promise<void> {
     await this.client.setex(key, this.ttl, value);
-    this.logger.log(`written key: ${key}`);
+    this.logger.log(`create cache key: ${key}`);
   }
 
   async get(key: string): Promise<string | null> {
     const value = await this.client.get(key);
     if (!value) return null;
+    this.logger.log(`get cache key: ${key}`);
     return value;
   }
 

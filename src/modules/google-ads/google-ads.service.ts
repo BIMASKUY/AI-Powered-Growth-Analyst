@@ -92,7 +92,7 @@ export class GoogleAdsService {
   ): ServiceKey {
     return {
       user_id: userId,
-      service: Platform.GOOGLE_ADS,
+      service: this.SERVICE_NAME,
       method: method,
       start_date: dto.start_date,
       end_date: dto.end_date,
@@ -155,7 +155,6 @@ export class GoogleAdsService {
     if (cache) return cache;
 
     const customer = await this.getCustomer(userId);
-
     const campaigns = await this.fetchGetOverall(
       customer,
       dto.start_date,
@@ -163,7 +162,6 @@ export class GoogleAdsService {
     );
 
     const currencyCode = await this.getCurrencyCode(customer);
-
     const formattedCampaigns = this.formatGetOverall(campaigns, currencyCode);
 
     // create cache
@@ -243,7 +241,6 @@ export class GoogleAdsService {
     if (cache) return cache;
 
     const customer = await this.getCustomer(userId);
-
     const campaigns = await this.fetchGetDaily(
       customer,
       dto.start_date,
@@ -255,7 +252,6 @@ export class GoogleAdsService {
     if (!hasData) return [] as DailyMetrics[];
 
     const currencyCode = await this.getCurrencyCode(customer);
-
     const formattedCampaigns = this.formatGetDaily(campaigns, currencyCode);
 
     // create cache
@@ -341,7 +337,6 @@ export class GoogleAdsService {
     if (cache) return cache;
 
     const customer = await this.getCustomer(userId);
-
     const campaigns = await this.fetchGetCampaigns(
       customer,
       dto.start_date,
@@ -353,7 +348,6 @@ export class GoogleAdsService {
     if (!hasData) return [] as CampaignMetrics[];
 
     const currencyCode = await this.getCurrencyCode(customer);
-
     const formattedCampaigns = this.formatGetCampaigns(campaigns, currencyCode);
 
     // create cache
@@ -430,7 +424,6 @@ export class GoogleAdsService {
     userId: string,
   ): Promise<DailyMetrics[]> {
     const customer = await this.getCustomer(userId);
-
     const campaign = await this.fetchGetCampaignById(
       customer,
       dto.start_date,
@@ -443,7 +436,6 @@ export class GoogleAdsService {
     if (!hasData) return [] as DailyMetrics[];
 
     const currencyCode = await this.getCurrencyCode(customer);
-
     const formattedCampaign = this.formatGetCampaignById(
       campaign,
       currencyCode,

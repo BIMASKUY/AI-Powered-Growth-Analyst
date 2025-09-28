@@ -4,9 +4,10 @@ import { GoogleSearchConsoleController } from './google-search-console.controlle
 import { GoogleOauthModule } from '../google-oauth/google-oauth.module';
 import { GoogleSearchConsoleRepository } from './google-search-console.repository';
 import { CosmosModule } from '../cosmos/cosmos.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [GoogleOauthModule, CosmosModule],
+  imports: [GoogleOauthModule, CosmosModule, RedisModule],
   controllers: [GoogleSearchConsoleController],
   providers: [GoogleSearchConsoleService, GoogleSearchConsoleRepository],
   exports: [GoogleSearchConsoleService, GoogleSearchConsoleRepository],
