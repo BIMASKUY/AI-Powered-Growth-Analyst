@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { GoogleOauthModule } from './modules/google-oauth/google-oauth.module';
 import { CosmosModule } from './modules/cosmos/cosmos.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     GoogleOauthModule,
     CosmosModule,
     PlatformModule,
+    RedisModule,
     GoogleAnalyticsModule,
     GoogleSearchConsoleModule,
     GoogleAdsModule,
