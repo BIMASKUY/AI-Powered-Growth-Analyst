@@ -6,13 +6,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateDto } from './dto/create.dto';
-import { OAuth2Client, OAuth2ClientOptions } from 'google-auth-library';
+import {
+  Credentials,
+  OAuth2Client,
+  OAuth2ClientOptions,
+} from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
 // import { RedisService } from '../common/service/redis.service';
 import { GoogleOauthRepository } from './google-oauth.repository';
 import { GoogleOauthEntity } from './entities/google-oauth.entity';
 import { Platform, Scope } from './google-oauth.enum';
+import { Result } from '../../global/global.type';
 
 @Injectable()
 export class GoogleOauthService {
@@ -24,11 +29,11 @@ export class GoogleOauthService {
     // private readonly redisService: RedisService,
     private readonly googleOauthRepository: GoogleOauthRepository,
   ) {
-    const env = this.configService.getOrThrow('ENV');
+    const env = this.configService.getOrThrow<string>('ENV');
     const isDevelopment = env === 'dev';
     const redirectUri = isDevelopment
-      ? this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_DEV')
-      : this.configService.getOrThrow('GOOGLE_REDIRECT_URI_FE_PROD');
+      ? this.configService.getOrThrow<string>('GOOGLE_REDIRECT_URI_FE_DEV')
+      : this.configService.getOrThrow<string>('GOOGLE_REDIRECT_URI_FE_PROD');
 
     this.oauth2ClientSchema = {
       clientId: this.configService.getOrThrow('GOOGLE_CLIENT_ID'),
@@ -37,7 +42,7 @@ export class GoogleOauthService {
     };
   }
 
-  private async getTokenByCode(code: string) {
+  private async getTokenByCode(code: string): Promise<Result<Credentials>> {
     try {
       const oauth2Client = new OAuth2Client(this.oauth2ClientSchema);
       const { tokens } = await oauth2Client.getToken(code);
@@ -47,7 +52,7 @@ export class GoogleOauthService {
         error: null,
       };
     } catch (error) {
-      this.logger.error(error.message);
+      this.logger.error(error);
       return {
         data: null,
         error: 'invalid credentials',
@@ -158,13 +163,13 @@ export class GoogleOauthService {
         return Scope.GOOGLE_SEARCH_CONSOLE;
       case Platform.GOOGLE_ADS:
         return Scope.GOOGLE_ADS;
-      default:
-        this.logger.error(`invalid platform: ${platform}`);
-        return null;
     }
   }
 
-  async getOauth2Client(platform: Platform, clientId: string) {
+  async getOauth2Client(
+    platform: Platform,
+    clientId: string,
+  ): Promise<Result<OAuth2Client>> {
     const googleOauth = await this.googleOauthRepository.getByUserId(clientId);
     if (!googleOauth) {
       return {
