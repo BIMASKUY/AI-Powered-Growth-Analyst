@@ -10,7 +10,7 @@ import { Platform } from '../google-oauth/google-oauth.enum';
 import { GoogleAdsRepository } from './google-ads.repository';
 import { RedisService } from '../redis/redis.service';
 import { BaseMetrics, CampaignMetrics, DailyMetrics } from './google-ads.type';
-import { ServiceKey } from '../redis/redis.type';
+import { ParamServiceKey, ServiceKey } from '../redis/redis.type';
 import { Method } from './google-ads.enum';
 
 @Injectable()
@@ -96,6 +96,22 @@ export class GoogleAdsService {
       method: method,
       start_date: dto.start_date,
       end_date: dto.end_date,
+    };
+  }
+
+  private getParamKeyCache(
+    dto: GetCampaignByIdDto,
+    method: Method,
+    param: string,
+    userId: string,
+  ): ParamServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+      param: param,
     };
   }
 
@@ -423,6 +439,11 @@ export class GoogleAdsService {
     campaignId: string,
     userId: string,
   ): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getParamKeyCache(dto, Method.GET_CAMPAIGN_BY_ID, campaignId, userId);
+    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+
     const customer = await this.getCustomer(userId);
     const campaign = await this.fetchGetCampaignById(
       customer,
@@ -431,7 +452,7 @@ export class GoogleAdsService {
       campaignId,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = campaign?.length > 0;
     if (!hasData) return [] as DailyMetrics[];
 
@@ -440,6 +461,13 @@ export class GoogleAdsService {
       campaign,
       currencyCode,
     );
+
+    // create cache
+    await this.redisService.createParamService<DailyMetrics[]>(
+      keyCache,
+      formattedCampaign,
+    );
+
     return formattedCampaign;
   }
 

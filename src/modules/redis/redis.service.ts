@@ -62,6 +62,11 @@ export class RedisService {
     await this.redisRepository.create(formattedKey, formattedValue);
   }
 
+  async createPlatform<T>(key: string, value: T): Promise<void> {
+    const formattedValue = this.formatValueToString<T>(value);
+    await this.redisRepository.create(key, formattedValue);
+  }
+
   async getService<T>(key: ServiceKey): Promise<T | null> {
     const formattedKey = this.formatKey(key);
     const value = await this.redisRepository.get(formattedKey);
@@ -83,6 +88,14 @@ export class RedisService {
   async getParamService<T>(key: ParamServiceKey): Promise<T | null> {
     const formattedKey = this.paramFormatKey(key);
     const value = await this.redisRepository.get(formattedKey);
+    if (!value) return null;
+
+    const formattedValue = this.formatValueToJson<T>(value);
+    return formattedValue;
+  }
+
+  async getPlatform<T>(key: string): Promise<T | null> {
+    const value = await this.redisRepository.get(key);
     if (!value) return null;
 
     const formattedValue = this.formatValueToJson<T>(value);

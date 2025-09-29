@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { CosmosService } from '../cosmos/cosmos.service';
 import { Container } from '@azure/cosmos';
 import { PlatformEntity } from '../platform/entities/platform.entity';
-import { GoogleSearchConsole } from '../platform/entities/google-search-console.entity';
+import { GoogleSearchConsole } from './entities/google-search-console.entity';
 
 @Injectable()
 export class GoogleSearchConsoleRepository implements OnModuleInit {

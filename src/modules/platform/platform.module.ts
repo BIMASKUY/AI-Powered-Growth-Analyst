@@ -7,6 +7,7 @@ import { GoogleOauthModule } from '../google-oauth/google-oauth.module';
 import { GoogleAnalyticsModule } from '../google-analytics/google-analytics.module';
 import { GoogleSearchConsoleModule } from '../google-search-console/google-search-console.module';
 import { GoogleAdsModule } from '../google-ads/google-ads.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GoogleAdsModule } from '../google-ads/google-ads.module';
     GoogleAnalyticsModule,
     GoogleSearchConsoleModule,
     GoogleAdsModule,
+    RedisModule
   ],
   controllers: [PlatformController],
   providers: [PlatformService, PlatformRepository],

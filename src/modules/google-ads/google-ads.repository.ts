@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { CosmosService } from '../cosmos/cosmos.service';
 import { Container } from '@azure/cosmos';
 import { PlatformEntity } from '../platform/entities/platform.entity';
+import { GoogleAds } from './entities/google-ads.entity';
 
 @Injectable()
 export class GoogleAdsRepository implements OnModuleInit {
@@ -11,7 +12,7 @@ export class GoogleAdsRepository implements OnModuleInit {
 
   constructor(private readonly cosmosService: CosmosService) {}
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     const { statusCode } = await this.cosmosService
       .getDatabase()
       .containers.createIfNotExists({ id: this.containerId });
@@ -26,7 +27,7 @@ export class GoogleAdsRepository implements OnModuleInit {
       .container(this.containerId);
   }
 
-  async getAccount(userId: string) {
+  async getAccount(userId: string): Promise<GoogleAds> {
     const querySpec = {
       query: 'SELECT TOP 1 * FROM c WHERE c.user_id = @userId',
       parameters: [

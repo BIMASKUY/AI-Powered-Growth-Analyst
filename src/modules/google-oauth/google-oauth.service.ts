@@ -18,6 +18,7 @@ import { GoogleOauthRepository } from './google-oauth.repository';
 import { GoogleOauthEntity } from './entities/google-oauth.entity';
 import { Platform, Scope } from './google-oauth.enum';
 import { Result } from '../../global/global.type';
+import { GoogleOauth, UserInfo } from './google-oauth.type';
 
 @Injectable()
 export class GoogleOauthService {
@@ -76,7 +77,7 @@ export class GoogleOauthService {
   //   }
   // }
 
-  async create(dto: CreateDto, userId: string) {
+  async create(dto: CreateDto, userId: string): Promise<GoogleOauthEntity> {
     const googleOauthExists =
       await this.googleOauthRepository.getByUserId(userId);
 
@@ -95,7 +96,7 @@ export class GoogleOauthService {
     return googleOauth;
   }
 
-  async getByUserId(userId: string) {
+  async getByUserId(userId: string): Promise<GoogleOauth> {
     const googleOauth = await this.googleOauthRepository.getByUserId(userId);
     if (!googleOauth) throw new NotFoundException('google oauth not found');
 
@@ -115,7 +116,7 @@ export class GoogleOauthService {
     };
   }
 
-  private async getUserInfo(googleOauth: GoogleOauthEntity) {
+  private async getUserInfo(googleOauth: GoogleOauthEntity): Promise<UserInfo> {
     const { access_token, refresh_token, expiry_date } = googleOauth;
 
     const oauth2Client = new OAuth2Client(this.oauth2ClientSchema);
@@ -155,7 +156,7 @@ export class GoogleOauthService {
     return null;
   }
 
-  private getScopeFromPlatform(platform: Platform) {
+  private getScopeFromPlatform(platform: Platform): Scope {
     switch (platform) {
       case Platform.GOOGLE_ANALYTICS:
         return Scope.GOOGLE_ANALYTICS;

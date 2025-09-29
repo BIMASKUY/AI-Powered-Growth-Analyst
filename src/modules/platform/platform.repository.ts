@@ -27,7 +27,7 @@ export class PlatformRepository implements OnModuleInit {
       .container(this.containerId);
   }
 
-  async upsert(dto: UpsertDto, userId: string) {
+  async upsert(dto: UpsertDto, userId: string): Promise<PlatformEntity> {
     const data = {
       id: userId, // use userId as the id to ensure one-to-one relationship
       platforms: {

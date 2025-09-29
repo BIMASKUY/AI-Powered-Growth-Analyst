@@ -19,7 +19,7 @@ import { GoogleOauthService } from '../google-oauth/google-oauth.service';
 import { Platform } from '../google-oauth/google-oauth.enum';
 import { GoogleSearchConsoleRepository } from './google-search-console.repository';
 import { PropertyType } from '../platform/platform.enum';
-import { GoogleSearchConsole } from '../platform/entities/google-search-console.entity';
+import { GoogleSearchConsole } from './entities/google-search-console.entity';
 import { RedisService } from '../redis/redis.service';
 import { Method } from './google-search-console.enum';
 import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from '../redis/redis.type';
@@ -78,7 +78,7 @@ export class GoogleSearchConsoleService {
   private getFullCountryName(countryCode: string): string {
     const code = countryCode.toUpperCase();
 
-    // Special case
+    // special case
     const specialCodes: Record<string, string> = {
       ZZZ: 'Unknown Country',
       XKK: 'Kosovo',

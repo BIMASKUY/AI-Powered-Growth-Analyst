@@ -1,4 +1,4 @@
-import { PropertyType } from '../platform.enum';
+import { PropertyType } from '../../platform/platform.enum';
 
 export interface GoogleSearchConsole {
   property_type: PropertyType;

@@ -19,7 +19,7 @@ import { Platform } from '../google-oauth/google-oauth.enum';
 import { GoogleAnalyticsRepository } from './google-analytics.repository';
 import { RedisService } from '../redis/redis.service';
 import { Method } from './google-analytics.enum';
-import { BaseMetrics, CountryMetrics, DailyMetrics, PageMetrics } from './google-analytics.type';
+import { BaseMetrics, CountryMetrics, DailyMetrics, PageMetrics, Property } from './google-analytics.type';
 import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from '../redis/redis.type';
 
 @Injectable()
@@ -870,7 +870,7 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getAllProperties(userId: string) {
+  async getAllProperties(userId: string): Promise<Property[]> {
     const { data: oauth2Client, error } =
       await this.googleOauthService.getOauth2Client(
         this.SERVICE_NAME,
@@ -887,7 +887,7 @@ export class GoogleAnalyticsService {
 
     const rawAccount = await analytics.accounts.list();
     const account = rawAccount.data?.accounts?.[0];
-    if (!account) return [] as { property_id: string; property_name: string }[];
+    if (!account) return [] as Property[];
 
     const propertiesResponse = await analytics.properties.list({
       filter: `parent:${account.name}`,
@@ -895,7 +895,7 @@ export class GoogleAnalyticsService {
 
     const properties = propertiesResponse.data?.properties;
     if (!properties)
-      return [] as { property_id: string; property_name: string }[];
+      return [] as Property[];
 
     const formattedProperties = properties.map((property) => {
       const propertyId = property.name.split('/').pop();
@@ -910,7 +910,7 @@ export class GoogleAnalyticsService {
     return formattedProperties;
   }
 
-  async getCurrentProperty(userId: string) {
+  async getCurrentProperty(userId: string): Promise<Property> {
     const [propertyId, currentOauth2Client] = await Promise.all([
       this.googleAnalyticsRepository.getPropertyId(userId),
       this.googleOauthService.getOauth2Client(this.SERVICE_NAME, userId),
@@ -943,7 +943,7 @@ export class GoogleAnalyticsService {
     };
   }
 
-  async isConnected(userId: string) {
+  async isConnected(userId: string): Promise<boolean> {
     try {
       const today = getToday();
       await this.getOverall(
