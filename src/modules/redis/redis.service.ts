@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisRepository } from './redis.repository';
-import { AdvancedServiceKey, ServiceKey } from './redis.type';
+import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from './redis.type';
 
 @Injectable()
 export class RedisService {
@@ -26,6 +26,13 @@ export class RedisService {
     return `${baseKey}:${limit}:${search}`;
   }
 
+  private paramFormatKey(key: ParamServiceKey): string {
+    const baseKey = this.formatKey(key);
+    const param = `param=${key.param}`;
+
+    return `${baseKey}:${param}`;
+  }
+
   private formatValueToString<T>(value: T): string {
     return JSON.stringify(value);
   }
@@ -49,6 +56,12 @@ export class RedisService {
     await this.redisRepository.create(formattedKey, formattedValue);
   }
 
+  async createParamService<T>(key: ParamServiceKey, value: T): Promise<void> {
+    const formattedKey = this.paramFormatKey(key);
+    const formattedValue = this.formatValueToString<T>(value);
+    await this.redisRepository.create(formattedKey, formattedValue);
+  }
+
   async getService<T>(key: ServiceKey): Promise<T | null> {
     const formattedKey = this.formatKey(key);
     const value = await this.redisRepository.get(formattedKey);
@@ -60,6 +73,15 @@ export class RedisService {
 
   async getAdvancedService<T>(key: AdvancedServiceKey): Promise<T | null> {
     const formattedKey = this.advancedFormatKey(key);
+    const value = await this.redisRepository.get(formattedKey);
+    if (!value) return null;
+
+    const formattedValue = this.formatValueToJson<T>(value);
+    return formattedValue;
+  }
+
+  async getParamService<T>(key: ParamServiceKey): Promise<T | null> {
+    const formattedKey = this.paramFormatKey(key);
     const value = await this.redisRepository.get(formattedKey);
     if (!value) return null;
 

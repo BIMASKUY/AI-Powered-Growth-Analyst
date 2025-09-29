@@ -15,3 +15,7 @@ export interface AdvancedServiceKey extends ServiceKey {
   limit: number;
   search: string;
 }
+
+export interface ParamServiceKey extends ServiceKey {
+  param: string
+}

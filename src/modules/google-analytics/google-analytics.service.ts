@@ -20,7 +20,7 @@ import { GoogleAnalyticsRepository } from './google-analytics.repository';
 import { RedisService } from '../redis/redis.service';
 import { Method } from './google-analytics.enum';
 import { BaseMetrics, CountryMetrics, DailyMetrics, PageMetrics } from './google-analytics.type';
-import { AdvancedServiceKey, ServiceKey } from '../redis/redis.type';
+import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from '../redis/redis.type';
 
 @Injectable()
 export class GoogleAnalyticsService {
@@ -86,6 +86,22 @@ export class GoogleAnalyticsService {
       end_date: dto.end_date,
       limit: dto.limit,
       search: dto.search,
+    };
+  }
+
+  private getParamKeyCache(
+    dto: GetByPageDto,
+    method: Method,
+    param: string,
+    userId: string,
+  ): ParamServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+      param: param,
     };
   }
 
@@ -426,6 +442,11 @@ export class GoogleAnalyticsService {
   }
 
   async getByCountry(dto: GetByCountryDto, country: string, userId: string): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getParamKeyCache(dto, Method.GET_BY_COUNTRY, country, userId);
+    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetByCountry(
@@ -441,6 +462,9 @@ export class GoogleAnalyticsService {
     if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByCountry(rawData);
+
+    // create cache
+    await this.redisService.createParamService<DailyMetrics[]>(keyCache, formattedData);
 
     return formattedData;
   }
@@ -622,6 +646,11 @@ export class GoogleAnalyticsService {
   }
 
   async getByPage(dto: GetByPageDto, page: string, userId: string): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getParamKeyCache(dto, Method.GET_BY_PAGE, page, userId);
+    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetByPage(
@@ -637,6 +666,10 @@ export class GoogleAnalyticsService {
     if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByPage(rawData);
+
+    // create cache
+    await this.redisService.createParamService<DailyMetrics[]>(keyCache, formattedData);
+
     return formattedData;
   }
 
