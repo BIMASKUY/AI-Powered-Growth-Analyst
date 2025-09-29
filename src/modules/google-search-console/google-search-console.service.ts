@@ -22,7 +22,7 @@ import { PropertyType } from '../platform/platform.enum';
 import { GoogleSearchConsole } from '../platform/entities/google-search-console.entity';
 import { RedisService } from '../redis/redis.service';
 import { Method } from './google-search-console.enum';
-import { AdvancedServiceKey, ServiceKey } from '../redis/redis.type';
+import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from '../redis/redis.type';
 import {
   BaseMetrics,
   CountryMetrics,
@@ -145,6 +145,22 @@ export class GoogleSearchConsoleService {
       end_date: dto.end_date,
       limit: dto.limit,
       search: dto.search,
+    };
+  }
+
+  private getParamKeyCache(
+    dto: GetByKeywordDto,
+    method: Method,
+    param: string,
+    userId: string,
+  ): ParamServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+      param: param,
     };
   }
 
@@ -428,6 +444,11 @@ export class GoogleSearchConsoleService {
     keyword: string,
     userId: string,
   ): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getParamKeyCache(dto, Method.GET_BY_KEYWORD, keyword, userId);
+    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+
     const { searchConsole, siteUrl } =
       await this.getGoogleSearchConsole(userId);
 
@@ -444,6 +465,12 @@ export class GoogleSearchConsoleService {
     if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByKeyword(rawData);
+
+    // create cache
+    await this.redisService.createParamService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -618,6 +645,11 @@ export class GoogleSearchConsoleService {
     country: string,
     userId: string,
   ): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getParamKeyCache(dto, Method.GET_BY_COUNTRY, country, userId);
+    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+
     const { searchConsole, siteUrl } =
       await this.getGoogleSearchConsole(userId);
 
@@ -639,6 +671,12 @@ export class GoogleSearchConsoleService {
     if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByCountry(rawData);
+
+    // create cache
+    await this.redisService.createParamService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
