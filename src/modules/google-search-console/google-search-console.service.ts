@@ -88,7 +88,7 @@ export class GoogleSearchConsoleService {
       return specialCodes[code];
     }
 
-    const { country } = ISO.whereAlpha3(code); // 3 letter codes
+    const { country } = ISO.whereAlpha3(code); // 3-letter codes
     return country;
   }
 
@@ -100,7 +100,7 @@ export class GoogleSearchConsoleService {
       (c) => c.country.toLowerCase() === countryName.toLowerCase(),
     );
 
-    if (exactMatch) return exactMatch.alpha3; // return 3 letter code
+    if (exactMatch) return exactMatch.alpha3; // return 3-letter code
 
     // if not found, try partial match
     const partialMatches = allCountries.filter(

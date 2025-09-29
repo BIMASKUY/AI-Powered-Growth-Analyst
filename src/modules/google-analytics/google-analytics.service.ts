@@ -17,6 +17,10 @@ import { GetDailyOrganicDto } from './dto/get-daily-organic.dto';
 import { GoogleOauthService } from '../google-oauth/google-oauth.service';
 import { Platform } from '../google-oauth/google-oauth.enum';
 import { GoogleAnalyticsRepository } from './google-analytics.repository';
+import { RedisService } from '../redis/redis.service';
+import { Method } from './google-analytics.enum';
+import { BaseMetrics, CountryMetrics, DailyMetrics, PageMetrics } from './google-analytics.type';
+import { AdvancedServiceKey, ServiceKey } from '../redis/redis.type';
 
 @Injectable()
 export class GoogleAnalyticsService {
@@ -26,12 +30,13 @@ export class GoogleAnalyticsService {
   constructor(
     private readonly googleOauthService: GoogleOauthService,
     private readonly googleAnalyticsRepository: GoogleAnalyticsRepository,
+    private readonly redisService: RedisService,
   ) {}
 
-  private async getGoogleAnalytics(clientId: string) {
+  private async getGoogleAnalytics(userId: string) {
     const [propertyId, currentOauth2Client] = await Promise.all([
-      this.googleAnalyticsRepository.getPropertyId(clientId),
-      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
+      this.googleAnalyticsRepository.getPropertyId(userId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, userId),
     ]);
 
     const { data: oauth2Client, error } = currentOauth2Client;
@@ -51,6 +56,36 @@ export class GoogleAnalyticsService {
     return {
       propertyId,
       analytics,
+    };
+  }
+
+  private getKeyCache(
+    dto: GetOverallDto,
+    method: Method,
+    userId: string,
+  ): ServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+    };
+  }
+
+  private getAdvancedKeyCache(
+    dto: GetPagesDto,
+    method: Method,
+    userId: string,
+  ): AdvancedServiceKey {
+    return {
+      user_id: userId,
+      service: this.SERVICE_NAME,
+      method: method,
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+      limit: dto.limit,
+      search: dto.search,
     };
   }
 
@@ -83,7 +118,7 @@ export class GoogleAnalyticsService {
 
   private formatGetOverall(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): BaseMetrics {
     const metricValues = rawData.rows[0].metricValues;
     const bounceRate = Number(metricValues[2].value);
     const bounceRatePercent = roundNumber<number>(bounceRate * 100);
@@ -99,10 +134,14 @@ export class GoogleAnalyticsService {
     };
   }
 
-  // all include organic traffic
-  async getOverall(dto: GetOverallDto, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  // overall traffic include organic traffic and paid ads traffic
+  async getOverall(dto: GetOverallDto, userId: string): Promise<BaseMetrics> {
+    // get cache
+    const keyCache = this.getKeyCache(dto, Method.GET_OVERALL, userId);
+    const cache = await this.redisService.getService<BaseMetrics>(keyCache);
+    if (cache) return cache;
 
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
     const rawData = await this.fetchGetOverall(
       analytics,
       propertyId,
@@ -110,11 +149,14 @@ export class GoogleAnalyticsService {
       dto.end_date,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return {};
+    if (!hasData) return {} as BaseMetrics;
 
     const formattedData = this.formatGetOverall(rawData);
+
+    // create cache
+    await this.redisService.createService<BaseMetrics>(keyCache, formattedData);
 
     return formattedData;
   }
@@ -154,7 +196,7 @@ export class GoogleAnalyticsService {
 
   private formatGetDaily(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): DailyMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows.map((row) => {
@@ -178,8 +220,13 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getDaily(dto: GetDailyDto, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  async getDaily(dto: GetDailyDto, userId: string): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getKeyCache(dto, Method.GET_DAILY, userId);
+    const cache = await this.redisService.getService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetDaily(
       analytics,
@@ -188,11 +235,17 @@ export class GoogleAnalyticsService {
       dto.end_date,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetDaily(rawData);
+
+    // create cache
+    await this.redisService.createService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -247,7 +300,7 @@ export class GoogleAnalyticsService {
 
   private formatGetCountries(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): CountryMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows.map((row) => {
@@ -269,22 +322,13 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getCountries(dto: GetCountriesDto, clientId: string) {
-    // Check cache first (the cache is only for query without search)
-    // const cachedData = await this.redisService.get(
-    //   clientId,
-    //   this.SERVICE_NAME,
-    //   'get-by-countries',
-    //   query.start_date,
-    //   query.end_date,
-    //   true,
-    //   query.order_by,
-    //   query.limit,
-    //   query.page,
-    // );
-    // if (cachedData && !query.search) return cachedData as GetByCountries;
+  async getCountries(dto: GetCountriesDto, userId: string): Promise<CountryMetrics[]> {
+    // get cache
+    const keyCache = this.getAdvancedKeyCache(dto, Method.GET_COUNTRIES, userId);
+    const cache = await this.redisService.getAdvancedService<CountryMetrics[]>(keyCache);
+    if (cache) return cache;
 
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetCountries(
       analytics,
@@ -295,33 +339,17 @@ export class GoogleAnalyticsService {
       dto.search,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as CountryMetrics[];
 
     const formattedData = this.formatGetCountries(rawData);
 
-    // Save cache to redis (only for query without search)
-    // if (!query.search) {
-    //   await this.redisService.add(
-    //     {
-    //       clientId,
-    //       service: this.SERVICE_NAME,
-    //       method: 'get-by-countries',
-    //       startDate: query.start_date,
-    //       endDate: query.end_date,
-    //       withAnalysis: true,
-    //       orderBy: query.order_by,
-    //       limit: query.limit,
-    //       page: query.page,
-    //     },
-    //     {
-    //       data: paginationFormattedData,
-    //       pagination: paginationInfo,
-    //       analysis,
-    //     },
-    //   );
-    // }
+    // create cache
+    await this.redisService.createAdvancedService<CountryMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -374,7 +402,7 @@ export class GoogleAnalyticsService {
 
   private formatGetByCountry(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): DailyMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows.map((row) => {
@@ -397,8 +425,8 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getByCountry(dto: GetByCountryDto, country: string, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  async getByCountry(dto: GetByCountryDto, country: string, userId: string): Promise<DailyMetrics[]> {
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetByCountry(
       analytics,
@@ -408,9 +436,9 @@ export class GoogleAnalyticsService {
       country,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByCountry(rawData);
 
@@ -467,7 +495,7 @@ export class GoogleAnalyticsService {
 
   private formatGetPages(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): PageMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows.map((row) => {
@@ -490,8 +518,14 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getPages(dto: GetPagesDto, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  async getPages(dto: GetPagesDto, userId: string): Promise<PageMetrics[]> {
+    // get cache
+    const keyCache = this.getAdvancedKeyCache(dto, Method.GET_PAGES, userId);
+    const cache =
+      await this.redisService.getAdvancedService<PageMetrics[]>(keyCache);
+    if (cache) return cache;
+
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetPages(
       analytics,
@@ -502,12 +536,18 @@ export class GoogleAnalyticsService {
       dto.search,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as PageMetrics[];
 
     const formattedData = this.formatGetPages(rawData);
 
+    // create cache
+    await this.redisService.createAdvancedService<PageMetrics[]>(
+      keyCache,
+      formattedData,
+    );
+    
     return formattedData;
   }
 
@@ -557,7 +597,7 @@ export class GoogleAnalyticsService {
 
   private formatGetByPage(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): DailyMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows.map((row) => {
@@ -581,20 +621,20 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getByPage(query: GetByPageDto, page: string, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  async getByPage(dto: GetByPageDto, page: string, userId: string): Promise<DailyMetrics[]> {
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetByPage(
       analytics,
       propertyId,
-      query.start_date,
-      query.end_date,
+      dto.start_date,
+      dto.end_date,
       page,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetByPage(rawData);
     return formattedData;
@@ -646,7 +686,7 @@ export class GoogleAnalyticsService {
 
   private formatGetOverallOrganic(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): BaseMetrics {
     const metricValues = rawData.rows[0].metricValues;
     const bounceRate = Number(metricValues[2].value);
     const bounceRatePercent = roundNumber<number>(bounceRate * 100);
@@ -662,9 +702,14 @@ export class GoogleAnalyticsService {
     };
   }
 
-  // Organic traffic refers to the visitors who arrive at a website through unpaid search results
-  async getOverallOrganic(dto: GetOverallOrganicDto, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  // organic traffic refers to the visitors who arrive at a website through unpaid search results
+  async getOverallOrganic(dto: GetOverallOrganicDto, userId: string): Promise<BaseMetrics> {
+    // get cache
+    const keyCache = this.getKeyCache(dto, Method.GET_OVERALL_ORGANIC, userId);
+    const cache = await this.redisService.getService<BaseMetrics>(keyCache);
+    if (cache) return cache;
+    
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetOverallOrganic(
       analytics,
@@ -673,11 +718,15 @@ export class GoogleAnalyticsService {
       dto.end_date,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return {};
+    if (!hasData) return {} as BaseMetrics;
 
     const formattedData = this.formatGetOverallOrganic(rawData);
+
+    // create cache
+    await this.redisService.createService<BaseMetrics>(keyCache, formattedData);
+    
     return formattedData;
   }
 
@@ -735,7 +784,7 @@ export class GoogleAnalyticsService {
 
   private formatGetDailyOrganic(
     rawData: analyticsdata_v1beta.Schema$RunReportResponse,
-  ) {
+  ): DailyMetrics[] {
     const { rows } = rawData;
 
     const formattedData = rows.map((row) => {
@@ -758,29 +807,41 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getDailyOrganic(query: GetDailyOrganicDto, clientId: string) {
-    const { propertyId, analytics } = await this.getGoogleAnalytics(clientId);
+  async getDailyOrganic(dto: GetDailyOrganicDto, userId: string): Promise<DailyMetrics[]> {
+    // get cache
+    const keyCache = this.getKeyCache(dto, Method.GET_DAILY_ORGANIC, userId);
+    const cache = await this.redisService.getService<DailyMetrics[]>(keyCache);
+    if (cache) return cache;
+    
+    const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetDailyOrganic(
       analytics,
       propertyId,
-      query.start_date,
-      query.end_date,
+      dto.start_date,
+      dto.end_date,
     );
 
-    // Case when data not found
+    // case when data not found
     const hasData = rawData?.rowCount > 0;
-    if (!hasData) return [] as string[];
+    if (!hasData) return [] as DailyMetrics[];
 
     const formattedData = this.formatGetDailyOrganic(rawData);
+
+    // create cache
+    await this.redisService.createService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
+
     return formattedData;
   }
 
-  async getAllProperties(clientId: string) {
+  async getAllProperties(userId: string) {
     const { data: oauth2Client, error } =
       await this.googleOauthService.getOauth2Client(
         this.SERVICE_NAME,
-        clientId,
+        userId,
       );
     if (error) {
       throw new NotFoundException(error);
@@ -816,10 +877,10 @@ export class GoogleAnalyticsService {
     return formattedProperties;
   }
 
-  async getCurrentProperty(clientId: string) {
+  async getCurrentProperty(userId: string) {
     const [propertyId, currentOauth2Client] = await Promise.all([
-      this.googleAnalyticsRepository.getPropertyId(clientId),
-      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, clientId),
+      this.googleAnalyticsRepository.getPropertyId(userId),
+      this.googleOauthService.getOauth2Client(this.SERVICE_NAME, userId),
     ]);
 
     const { data: oauth2Client, error } = currentOauth2Client;
@@ -849,7 +910,7 @@ export class GoogleAnalyticsService {
     };
   }
 
-  async isConnected(clientId: string) {
+  async isConnected(userId: string) {
     try {
       const today = getToday();
       await this.getOverall(
@@ -857,7 +918,7 @@ export class GoogleAnalyticsService {
           start_date: today,
           end_date: today,
         },
-        clientId,
+        userId,
       );
 
       return true;

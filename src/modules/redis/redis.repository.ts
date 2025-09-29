@@ -38,16 +38,25 @@ export class RedisRepository implements OnModuleInit, OnModuleDestroy {
     const useSSL = sslPart
       ? sslPart.split('=')[1].toLowerCase() === 'true'
       : false;
+    const tls = useSSL ? { servername: host } : undefined;
 
     this.client = new Redis({
       host,
       port: parseInt(port),
       password,
-      tls: useSSL ? {} : undefined,
-      maxLoadingRetryTime: 100,
+      tls,
+      db: 0,
+      connectTimeout: 10000,
+      commandTimeout: 5000,
+      maxLoadingRetryTime: 10000,
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
+      keepAlive: 30000,
+      retryStrategy: (times) => {
+        // exponential backoff, max 10s
+        return Math.min(times * 200, 10000);
+      },
     });
 
     this.client.on('connect', () => {
