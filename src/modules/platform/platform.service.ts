@@ -58,6 +58,11 @@ export class PlatformService {
     }
 
     const platform = await this.platformRepository.upsert(dto, userId);
+
+    // delete cache
+    const keyCache = `user_id=${userId}`;
+    await this.redisService.delete(keyCache);
+
     return platform;
   }
 

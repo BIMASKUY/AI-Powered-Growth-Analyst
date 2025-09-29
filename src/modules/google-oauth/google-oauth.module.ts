@@ -3,9 +3,10 @@ import { GoogleOauthService } from './google-oauth.service';
 import { GoogleOauthController } from './google-oauth.controller';
 import { GoogleOauthRepository } from './google-oauth.repository';
 import { CosmosModule } from '../cosmos/cosmos.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [CosmosModule],
+  imports: [CosmosModule, RedisModule],
   controllers: [GoogleOauthController],
   providers: [GoogleOauthService, GoogleOauthRepository],
   exports: [GoogleOauthService],

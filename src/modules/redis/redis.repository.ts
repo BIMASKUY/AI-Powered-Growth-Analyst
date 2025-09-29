@@ -12,7 +12,7 @@ import { Redis } from 'ioredis';
 export class RedisRepository implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisRepository.name);
   private readonly ttl: number;
-  private client: Redis;
+  private redis: Redis;
 
   constructor(private readonly configService: ConfigService) {
     const connectionString = this.configService.getOrThrow<string>(
@@ -40,7 +40,7 @@ export class RedisRepository implements OnModuleInit, OnModuleDestroy {
       : false;
     const tls = useSSL ? { servername: host } : undefined;
 
-    this.client = new Redis({
+    this.redis = new Redis({
       host,
       port: parseInt(port),
       password,
@@ -59,69 +59,82 @@ export class RedisRepository implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    this.client.on('connect', () => {
-      this.logger.log('Redis client connected');
+    this.redis.on('connect', () => {
+      this.logger.log('redis client connected');
     });
 
-    this.client.on('ready', () => {
-      this.logger.log('Redis client ready');
+    this.redis.on('ready', () => {
+      this.logger.log('redis client ready');
     });
 
-    this.client.on('error', (error) => {
-      this.logger.error('Redis client error:', error);
+    this.redis.on('error', (error) => {
+      this.logger.error('redis client error:', error);
     });
 
-    this.client.on('close', () => {
-      this.logger.warn('Redis client connection closed');
+    this.redis.on('close', () => {
+      this.logger.warn('redis client connection closed');
     });
 
-    this.client.on('reconnecting', () => {
-      this.logger.log('Redis client reconnecting...');
+    this.redis.on('reconnecting', () => {
+      this.logger.log('redis client reconnecting...');
     });
   }
 
   async onModuleInit() {
     try {
-      await this.client.connect();
-      const pong = await this.client.ping();
+      await this.redis.connect();
+      const pong = await this.redis.ping();
       if (pong === 'PONG') {
-        this.logger.log('Redis connection established successfully');
+        this.logger.log('redis connection established successfully');
       }
     } catch (error) {
-      this.logger.error('Failed to connect to Redis:', error);
+      this.logger.error('failed to connect to Redis:', error);
       throw error;
     }
   }
 
   async onModuleDestroy() {
     try {
-      await this.client.quit();
-      this.logger.log('Redis connection closed');
+      await this.redis.quit();
+      this.logger.log('redis connection closed');
     } catch (error) {
-      this.logger.error('Error closing Redis connection:', error);
+      this.logger.error('error closing redis connection:', error);
     }
   }
 
   async create(key: string, value: string): Promise<void> {
-    await this.client.setex(key, this.ttl, value);
+    await this.redis.setex(key, this.ttl, value);
     this.logger.log(`create cache key: ${key}`);
   }
 
   async get(key: string): Promise<string | null> {
-    const value = await this.client.get(key);
+    const value = await this.redis.get(key);
     if (!value) return null;
     this.logger.log(`get cache key: ${key}`);
     return value;
   }
 
-  // async delete(key: string): Promise<number> {
-  //   try {
-  //     const result = await this.client.del(key);
-  //     this.logger.debug(`Deleted key: ${key}`);
-  //     return result;
-  //   } catch (error) {
-  //     this.logger.error(`Failed to delete key ${key}:`, error);
-  //     throw error;
-  //   }
-  // }
+  async delete(key: string): Promise<void> {
+    const pattern = `${key}:*`;
+    const keys: string[] = [];
+    let cursor = '0';
+
+    do {
+      const result = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        100,
+      );
+      cursor = result[0];
+      keys.push(...result[1]);
+    } while (cursor !== '0');
+
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+
+    this.logger.log(`reset user_id: ${key}`);
+  }
 }

@@ -13,7 +13,7 @@ import {
 } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
-// import { RedisService } from '../common/service/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { GoogleOauthRepository } from './google-oauth.repository';
 import { GoogleOauthEntity } from './entities/google-oauth.entity';
 import { Platform, Scope } from './google-oauth.enum';
@@ -27,7 +27,7 @@ export class GoogleOauthService {
 
   constructor(
     private readonly configService: ConfigService,
-    // private readonly redisService: RedisService,
+    private readonly redisService: RedisService,
     private readonly googleOauthRepository: GoogleOauthRepository,
   ) {
     const env = this.configService.getOrThrow<string>('ENV');
@@ -60,22 +60,6 @@ export class GoogleOauthService {
       };
     }
   }
-
-  // private async resetGoogle(userId: string): Promise<void> {
-  //   const { error } = await this.supabaseService
-  //     .getClient()
-  //     .rpc('reset_google_services', {
-  //       client_id_param: userId,
-  //     });
-  //
-  //   if (error) {
-  //     Logger.error(
-  //       `Failed to reset Google services: ${error.message}`,
-  //       'GoogleOauthService',
-  //     );
-  //     throw new HttpException('Failed to reset Google services', 500);
-  //   }
-  // }
 
   async create(dto: CreateDto, userId: string): Promise<GoogleOauthEntity> {
     const googleOauthExists =

@@ -1,11 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { RedisRepository } from './redis.repository';
 import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from './redis.type';
 
 @Injectable()
 export class RedisService {
-  private readonly logger = new Logger(RedisService.name);
-
   constructor(private readonly redisRepository: RedisRepository) {}
 
   private formatKey(key: ServiceKey): string {
@@ -102,14 +100,7 @@ export class RedisService {
     return formattedValue;
   }
 
-  // async delete(key: string): Promise<number> {
-  //   try {
-  //     const result = await this.client.del(key);
-  //     this.logger.debug(`Deleted key: ${key}`);
-  //     return result;
-  //   } catch (error) {
-  //     this.logger.error(`Failed to delete key ${key}:`, error);
-  //     throw error;
-  //   }
-  // }
+  async delete(key: string): Promise<void> {
+    await this.redisRepository.delete(key);
+  }
 }
