@@ -18,9 +18,9 @@ export class GoogleSearchConsoleRepository implements OnModuleInit {
       .containers.createIfNotExists({ id: this.containerId });
     if (statusCode == 201)
       this.logger.warn(
-        `Creating container "${this.containerId}" as it did not exist.`,
+        `creating container "${this.containerId}" as it did not exist.`,
       );
-    else this.logger.log('Container exists');
+    else this.logger.log('container exists');
 
     this.currentContainer = this.cosmosService
       .getDatabase()

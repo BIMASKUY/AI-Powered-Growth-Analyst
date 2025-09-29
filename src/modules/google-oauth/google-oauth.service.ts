@@ -131,11 +131,12 @@ export class GoogleOauthService {
 
     await Promise.all([
       this.googleOauthRepository.deleteByUserId(userId),
-      // this.resetGoogle(userId),
+      this.googleOauthRepository.deletePlatform(userId),
     ]);
 
-    // Reset redis cache for this client
-    // await this.redisService.delete(userId);
+    // delete cache
+    const keyCache = `user_id=${userId}`;
+    await this.redisService.delete(keyCache);
 
     return null;
   }
