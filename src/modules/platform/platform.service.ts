@@ -13,7 +13,12 @@ import { Result } from '../../global/global.type';
 import { GoogleOauth } from '../google-oauth/google-oauth.type';
 import { PlatformEntity } from './entities/platform.entity';
 import { Property } from '../google-analytics/google-analytics.type';
-import { GoogleAdsPlatform, GoogleAnalyticsPlatform, GoogleSearchConsolePlatform, Platform } from './platform.type';
+import {
+  GoogleAdsPlatform,
+  GoogleAnalyticsPlatform,
+  GoogleSearchConsolePlatform,
+  Platform,
+} from './platform.type';
 import { PropertyType } from './platform.enum';
 
 @Injectable()
@@ -43,7 +48,7 @@ export class PlatformService {
         error: null,
       };
     } catch (error) {
-      this.logger.error(error.massage);
+      this.logger.error(error);
       return {
         data: null,
         error: 'google oauth not found',
@@ -66,7 +71,9 @@ export class PlatformService {
     return platform;
   }
 
-  private async getGoogleAnalytics(clientId: string): Promise<GoogleAnalyticsPlatform> {
+  private async getGoogleAnalytics(
+    clientId: string,
+  ): Promise<GoogleAnalyticsPlatform> {
     try {
       const [currentProperty, allProperties, isConnect] = await Promise.all([
         this.googleAnalyticsService.getCurrentProperty(clientId),
@@ -92,7 +99,9 @@ export class PlatformService {
     }
   }
 
-  private async getGoogleSearchConsole(clientId: string): Promise<GoogleSearchConsolePlatform> {
+  private async getGoogleSearchConsole(
+    clientId: string,
+  ): Promise<GoogleSearchConsolePlatform> {
     try {
       const [currentProperty, allProperties, isConnect] = await Promise.all([
         this.googleSearchConsoleRepository.getProperty(clientId),
@@ -155,11 +164,13 @@ export class PlatformService {
       throw new NotFoundException(googleOauthNotFound);
     }
 
-    const [googleAnalytics, googleSearchConsole, googleAds] = await Promise.all([
-      this.getGoogleAnalytics(userId),
-      this.getGoogleSearchConsole(userId),
-      this.getGoogleAds(userId),
-    ]);
+    const [googleAnalytics, googleSearchConsole, googleAds] = await Promise.all(
+      [
+        this.getGoogleAnalytics(userId),
+        this.getGoogleSearchConsole(userId),
+        this.getGoogleAds(userId),
+      ],
+    );
 
     // create cache
     await this.redisService.createPlatform<Platform>(keyCache, {

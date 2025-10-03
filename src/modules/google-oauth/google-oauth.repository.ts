@@ -79,7 +79,9 @@ export class GoogleOauthRepository implements OnModuleInit {
 
   async deletePlatform(userId: string): Promise<void> {
     const containerId = `platform`;
-    const currentContainer = this.cosmosService.getDatabase().container(containerId);
+    const currentContainer = this.cosmosService
+      .getDatabase()
+      .container(containerId);
 
     const querySpec = {
       query: 'SELECT TOP 1 * FROM c WHERE c.user_id = @userId',

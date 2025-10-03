@@ -19,8 +19,18 @@ import { Platform } from '../google-oauth/google-oauth.enum';
 import { GoogleAnalyticsRepository } from './google-analytics.repository';
 import { RedisService } from '../redis/redis.service';
 import { Method } from './google-analytics.enum';
-import { BaseMetrics, CountryMetrics, DailyMetrics, PageMetrics, Property } from './google-analytics.type';
-import { AdvancedServiceKey, ParamServiceKey, ServiceKey } from '../redis/redis.type';
+import {
+  BaseMetrics,
+  CountryMetrics,
+  DailyMetrics,
+  PageMetrics,
+  Property,
+} from './google-analytics.type';
+import {
+  AdvancedServiceKey,
+  ParamServiceKey,
+  ServiceKey,
+} from '../redis/redis.type';
 
 @Injectable()
 export class GoogleAnalyticsService {
@@ -127,8 +137,8 @@ export class GoogleAnalyticsService {
       });
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-overall');
     }
   }
 
@@ -205,8 +215,8 @@ export class GoogleAnalyticsService {
       });
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-daily');
     }
   }
 
@@ -309,8 +319,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-countries');
     }
   }
 
@@ -338,10 +348,18 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getCountries(dto: GetCountriesDto, userId: string): Promise<CountryMetrics[]> {
+  async getCountries(
+    dto: GetCountriesDto,
+    userId: string,
+  ): Promise<CountryMetrics[]> {
     // get cache
-    const keyCache = this.getAdvancedKeyCache(dto, Method.GET_COUNTRIES, userId);
-    const cache = await this.redisService.getAdvancedService<CountryMetrics[]>(keyCache);
+    const keyCache = this.getAdvancedKeyCache(
+      dto,
+      Method.GET_COUNTRIES,
+      userId,
+    );
+    const cache =
+      await this.redisService.getAdvancedService<CountryMetrics[]>(keyCache);
     if (cache) return cache;
 
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
@@ -411,8 +429,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-by-country');
     }
   }
 
@@ -441,10 +459,20 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getByCountry(dto: GetByCountryDto, country: string, userId: string): Promise<DailyMetrics[]> {
+  async getByCountry(
+    dto: GetByCountryDto,
+    country: string,
+    userId: string,
+  ): Promise<DailyMetrics[]> {
     // get cache
-    const keyCache = this.getParamKeyCache(dto, Method.GET_BY_COUNTRY, country, userId);
-    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    const keyCache = this.getParamKeyCache(
+      dto,
+      Method.GET_BY_COUNTRY,
+      country,
+      userId,
+    );
+    const cache =
+      await this.redisService.getParamService<DailyMetrics[]>(keyCache);
     if (cache) return cache;
 
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
@@ -464,7 +492,10 @@ export class GoogleAnalyticsService {
     const formattedData = this.formatGetByCountry(rawData);
 
     // create cache
-    await this.redisService.createParamService<DailyMetrics[]>(keyCache, formattedData);
+    await this.redisService.createParamService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -512,8 +543,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-pages');
     }
   }
 
@@ -571,7 +602,7 @@ export class GoogleAnalyticsService {
       keyCache,
       formattedData,
     );
-    
+
     return formattedData;
   }
 
@@ -614,8 +645,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-by-page');
     }
   }
 
@@ -645,10 +676,20 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getByPage(dto: GetByPageDto, page: string, userId: string): Promise<DailyMetrics[]> {
+  async getByPage(
+    dto: GetByPageDto,
+    page: string,
+    userId: string,
+  ): Promise<DailyMetrics[]> {
     // get cache
-    const keyCache = this.getParamKeyCache(dto, Method.GET_BY_PAGE, page, userId);
-    const cache = await this.redisService.getParamService<DailyMetrics[]>(keyCache);
+    const keyCache = this.getParamKeyCache(
+      dto,
+      Method.GET_BY_PAGE,
+      page,
+      userId,
+    );
+    const cache =
+      await this.redisService.getParamService<DailyMetrics[]>(keyCache);
     if (cache) return cache;
 
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
@@ -668,7 +709,10 @@ export class GoogleAnalyticsService {
     const formattedData = this.formatGetByPage(rawData);
 
     // create cache
-    await this.redisService.createParamService<DailyMetrics[]>(keyCache, formattedData);
+    await this.redisService.createParamService<DailyMetrics[]>(
+      keyCache,
+      formattedData,
+    );
 
     return formattedData;
   }
@@ -712,8 +756,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-overall-organic');
     }
   }
 
@@ -736,12 +780,15 @@ export class GoogleAnalyticsService {
   }
 
   // organic traffic refers to the visitors who arrive at a website through unpaid search results
-  async getOverallOrganic(dto: GetOverallOrganicDto, userId: string): Promise<BaseMetrics> {
+  async getOverallOrganic(
+    dto: GetOverallOrganicDto,
+    userId: string,
+  ): Promise<BaseMetrics> {
     // get cache
     const keyCache = this.getKeyCache(dto, Method.GET_OVERALL_ORGANIC, userId);
     const cache = await this.redisService.getService<BaseMetrics>(keyCache);
     if (cache) return cache;
-    
+
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetOverallOrganic(
@@ -759,7 +806,7 @@ export class GoogleAnalyticsService {
 
     // create cache
     await this.redisService.createService<BaseMetrics>(keyCache, formattedData);
-    
+
     return formattedData;
   }
 
@@ -810,8 +857,8 @@ export class GoogleAnalyticsService {
 
       return data;
     } catch (error) {
-      this.logger.error(error.message);
-      throw new BadRequestException(error.message);
+      this.logger.error(error);
+      throw new BadRequestException('failed fetch get-daily-organic');
     }
   }
 
@@ -840,12 +887,15 @@ export class GoogleAnalyticsService {
     return formattedData;
   }
 
-  async getDailyOrganic(dto: GetDailyOrganicDto, userId: string): Promise<DailyMetrics[]> {
+  async getDailyOrganic(
+    dto: GetDailyOrganicDto,
+    userId: string,
+  ): Promise<DailyMetrics[]> {
     // get cache
     const keyCache = this.getKeyCache(dto, Method.GET_DAILY_ORGANIC, userId);
     const cache = await this.redisService.getService<DailyMetrics[]>(keyCache);
     if (cache) return cache;
-    
+
     const { propertyId, analytics } = await this.getGoogleAnalytics(userId);
 
     const rawData = await this.fetchGetDailyOrganic(
@@ -872,10 +922,7 @@ export class GoogleAnalyticsService {
 
   async getAllProperties(userId: string): Promise<Property[]> {
     const { data: oauth2Client, error } =
-      await this.googleOauthService.getOauth2Client(
-        this.SERVICE_NAME,
-        userId,
-      );
+      await this.googleOauthService.getOauth2Client(this.SERVICE_NAME, userId);
     if (error) {
       throw new NotFoundException(error);
     }
@@ -894,8 +941,7 @@ export class GoogleAnalyticsService {
     });
 
     const properties = propertiesResponse.data?.properties;
-    if (!properties)
-      return [] as Property[];
+    if (!properties) return [] as Property[];
 
     const formattedProperties = properties.map((property) => {
       const propertyId = property.name.split('/').pop();

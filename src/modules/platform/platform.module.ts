@@ -16,7 +16,7 @@ import { RedisModule } from '../redis/redis.module';
     GoogleAnalyticsModule,
     GoogleSearchConsoleModule,
     GoogleAdsModule,
-    RedisModule
+    RedisModule,
   ],
   controllers: [PlatformController],
   providers: [PlatformService, PlatformRepository],

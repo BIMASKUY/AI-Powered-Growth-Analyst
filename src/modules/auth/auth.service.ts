@@ -5,6 +5,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { MicrosoftGraphUser, MicrosoftOAuth } from './auth.type';
 import { JwtService } from '@nestjs/jwt';
+import { Result } from '../../global/global.type';
 
 @Injectable()
 export class AuthService {
@@ -36,7 +37,7 @@ export class AuthService {
       : this.configService.getOrThrow<string>('MICROSOFT_REDIRECT_URI_FE_PROD');
   }
 
-  private async getAccessTokenByCode(code: string) {
+  private async getAccessTokenByCode(code: string): Promise<Result<string>> {
     try {
       const tokenParams = new URLSearchParams({
         grant_type: 'authorization_code',
@@ -65,8 +66,7 @@ export class AuthService {
         error: null,
       };
     } catch (error) {
-      const errorMessage = error.response.data?.error_description as string;
-      this.logger.error(errorMessage);
+      this.logger.error(error);
 
       return {
         data: null,
@@ -75,7 +75,7 @@ export class AuthService {
     }
   }
 
-  private async getUserId(accessToken: string) {
+  private async getUserId(accessToken: string): Promise<Result<string>> {
     try {
       const { data } = await firstValueFrom(
         this.httpService.get<MicrosoftGraphUser>(
@@ -91,8 +91,7 @@ export class AuthService {
         error: null,
       };
     } catch (error) {
-      const errorMessage = error.response.data?.error.message as string;
-      this.logger.error(errorMessage);
+      this.logger.error(error);
 
       return {
         data: null,

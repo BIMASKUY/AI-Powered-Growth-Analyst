@@ -17,5 +17,5 @@ export interface AdvancedServiceKey extends ServiceKey {
 }
 
 export interface ParamServiceKey extends ServiceKey {
-  param: string
+  param: string;
 }
